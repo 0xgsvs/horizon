@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} छोड़ दिया गया: इसे {other} चाहिए, जो छोड़ दिया गया",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "आप जो Horizon खेलते हैं उस पर नहीं बनता ({code}): बिल्ड इसे तब तक छोड़ देता है जब तक इसका लेखक इसे अपडेट न करे",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "आप जहाँ हैं, वहाँ संस्थापक सेट playhorizon.dev पर मुफ़्त चेकआउट से लिया जाता है। इसे दुकान से लें: वह आपके लिए चेकआउट खोल देती है।",
-  "The founder set can't be claimed from your country.": "संस्थापक सेट आपके देश से नहीं लिया जा सकता।"
+  "The founder set can't be claimed from your country.": "संस्थापक सेट आपके देश से नहीं लिया जा सकता।",
+  "Choose how to play": "खेलने का तरीका चुनें",
+  "Ely.by account": "Ely.by खाता",
+  "Enter the two-factor code from your authenticator.": "अपने प्रमाणक ऐप से दो-चरणीय कोड दर्ज करें।",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "अपने Ely.by लॉगिन से साइन इन करें। ऑनलाइन सर्वर तब खाते का उपयोग कर सकते हैं जब वे Ely.by स्वीकार करते हैं।",
+  "Signing in to Ely.by…": "Ely.by में साइन इन हो रहा है…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "माइक्रोसॉफ्ट खाता, Ely.by खाता इस्तेमाल करें या ऑफ़लाइन खेलें। इसे बाद में सेटिंग्स में बदल सकते हैं।",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "आपका पासवर्ड केवल authserver.ely.by को जाता है। लॉन्चर टोकन रखता है, पासवर्ड कभी नहीं।",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "खेलने के अन्य तरीके"
 }

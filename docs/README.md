@@ -12,6 +12,7 @@ To play, use [the launcher](../launcher/README.md); the project site is [playhor
 - [Build times](build-times.md): `tools/build_times.py` measures cold and incremental builds per crate and the critical path, writes a JSON report and a table, and compares two reports; the first numbers, Windows and Linux.
 - [Native client](native-client.md): options, controls, the dedicated server, `horizon-ctl` scripting, packaging, architecture.
 - [Controllers](controllers.md): playing with PlayStation, Xbox and Nintendo Switch Pro controllers, Steam Deck built-in controls, analog movement, and the input layer.
+- [Ely.by accounts](elyby-account.md): the game-side Ely.by sign-in, the kept token, offline names and `HORIZON_AUTH_PROVIDERS`.
 - [Host a server](hosting.md): install `horizon-server`, prepare the game files, first run, `server.toml`, the commands, the web panel, backups, services and Docker; what works today and what doesn't yet.
 - [A server's levels](server-levels.md): how the dedicated server and single player's server thread tick, save and travel between dimensions.
 - [Velocity forwarding](velocity-forwarding.md): the player-information exchange behind a Velocity proxy and how it was checked.

@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} tidak disertakan: membutuhkan {other}, yang tidak disertakan",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "Tidak bisa dibangun di Horizon yang kamu mainkan ({code}): build tidak menyertakannya sampai pembuatnya memperbaruinya",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "Di tempatmu, set pendiri diklaim lewat checkout gratis di playhorizon.dev. Klaim dari Toko: Toko akan membukakan checkout untukmu.",
-  "The founder set can't be claimed from your country.": "Set pendiri tidak bisa diklaim dari negaramu."
+  "The founder set can't be claimed from your country.": "Set pendiri tidak bisa diklaim dari negaramu.",
+  "Choose how to play": "Pilih cara bermain",
+  "Ely.by account": "Akun Ely.by",
+  "Enter the two-factor code from your authenticator.": "Masukkan kode dua faktor dari aplikasi autentikator Anda.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Masuk dengan login Ely.by Anda. Server online dapat menggunakan akun ini saat menerima Ely.by.",
+  "Signing in to Ely.by…": "Sedang masuk ke Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Gunakan akun Microsoft, akun Ely.by, atau bermain offline. Anda dapat mengubahnya nanti di Pengaturan.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Kata sandi Anda hanya dikirim ke authserver.ely.by. Launcher menyimpan token, bukan kata sandi.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "Cara lain untuk bermain"
 }

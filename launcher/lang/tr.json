@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} dışarıda bırakıldı: dışarıda bırakılan {other} gerekiyor",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "Oynadığın Horizon'da derlenmiyor ({code}): yazarı güncelleyene kadar derleme onu dışarıda bırakır",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "Bulunduğun yerde kurucu seti playhorizon.dev üzerinde ücretsiz bir ödeme ile alınır. Mağaza'dan al: ödemeyi senin için açar.",
-  "The founder set can't be claimed from your country.": "Kurucu seti ülkenden alınamaz."
+  "The founder set can't be claimed from your country.": "Kurucu seti ülkenden alınamaz.",
+  "Choose how to play": "Nasıl oynayacağını seç",
+  "Ely.by account": "Ely.by hesabı",
+  "Enter the two-factor code from your authenticator.": "Doğrulayıcı uygulamanızdaki iki faktörlü kodu girin.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Ely.by girişinizle oturum açın. Çevrimiçi sunucular Ely.by'ı desteklediğinde hesabı kullanabilir.",
+  "Signing in to Ely.by…": "Ely.by'a giriş yapılıyor…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Microsoft hesabı, Ely.by hesabı kullanın veya çevrimdışı oynayın. Bunu daha sonra Ayarlar'dan değiştirebilirsiniz.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Parolanız yalnızca authserver.ely.by'ye gönderilir. Başlatıcı jetonu saklar, parolayı asla saklamaz.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "Diğer oynama yolları"
 }

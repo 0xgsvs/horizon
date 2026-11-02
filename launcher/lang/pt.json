@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} ficou de fora: precisa de {other}, que ficou de fora",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "Não compila no Horizon que jogas ({code}): a compilação deixa-o de fora até que o autor o atualize",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "Onde está, o conjunto fundador obtém-se através de um pagamento gratuito em playhorizon.dev. Obtenha-o na Loja: ela abre o pagamento por si.",
-  "The founder set can't be claimed from your country.": "O conjunto fundador não pode ser obtido a partir do seu país."
+  "The founder set can't be claimed from your country.": "O conjunto fundador não pode ser obtido a partir do seu país.",
+  "Choose how to play": "Escolha como jogar",
+  "Ely.by account": "Conta Ely.by",
+  "Enter the two-factor code from your authenticator.": "Introduza o código de dois fatores da sua aplicação de autenticação.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Inicie sessão com o seu login Ely.by. Os servidores online podem usar a conta quando aceitam Ely.by.",
+  "Signing in to Ely.by…": "A iniciar sessão no Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Use uma conta Microsoft, uma conta Ely.by ou jogue offline. Pode alterar isto mais tarde nas Definições.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "A sua palavra-passe só é enviada para authserver.ely.by. O launcher guarda o token, nunca a palavra-passe.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "Outras formas de jogar"
 }

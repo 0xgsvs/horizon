@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} は除外されました: 除外された {other} が必要です",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "プレイ中の Horizon ではビルドできません ({code}): 作者が更新するまでビルドから除外されます",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "お住まいの地域では、ファウンダーセットは playhorizon.dev の無料チェックアウトで受け取ります。ショップから受け取ってください。チェックアウトが開きます。",
-  "The founder set can't be claimed from your country.": "お住まいの国ではファウンダーセットを受け取れません。"
+  "The founder set can't be claimed from your country.": "お住まいの国ではファウンダーセットを受け取れません。",
+  "Choose how to play": "プレイ方法を選択",
+  "Ely.by account": "Ely.by アカウント",
+  "Enter the two-factor code from your authenticator.": "認証アプリの2要素コードを入力してください。",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Ely.by のログインでサインインします。Ely.by に対応したオンラインサーバーではこのアカウントを使えます。",
+  "Signing in to Ely.by…": "Ely.by にサインインしています…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Microsoft アカウント、Ely.by アカウント、またはオフラインでプレイできます。後で設定から変更できます。",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "パスワードは authserver.ely.by にのみ送信されます。ランチャーはトークンを保存し、パスワードは保存しません。",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "別の方法でプレイ"
 }

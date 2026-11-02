@@ -61,14 +61,15 @@ Prepare a version's resources from your own Minecraft install, or from Mojang.
 
     horizon-launcher prepare
 
-- `--minecraft`: The game folder of the official launcher, Prism Launcher, MultiMC, the Modrinth App, ATLauncher or GDLauncher (default: the launcher's, then every launcher's default)
+- `--minecraft`: The game folder of the official launcher, Prism Launcher, PineconeMC, MultiMC, the Modrinth App, ATLauncher or GDLauncher (default: the launcher's, then every launcher's default)
 - `--download`: Download Minecraft from Mojang for the signed-in account that owns it, instead of using an install
 
 MCP: `prepare`.
 
 ## `horizon-launcher play`
 
-Start the client (needs a signed-in Microsoft account that owns Minecraft: Java Edition).
+Start the client as the selected player. A Microsoft account must own Minecraft: Java Edition;
+offline and Ely.by accounts need no Microsoft sign-in.
 
     horizon-launcher play
 
@@ -140,7 +141,7 @@ MCP: `links`.
 
 ## `horizon-launcher account list`
 
-The signed-in accounts and which one plays.
+The signed-in Microsoft and Ely.by accounts and which one plays.
 
     horizon-launcher account list
 
@@ -148,7 +149,7 @@ MCP: `account_list`.
 
 ## `horizon-launcher account sign-in`
 
-Sign in with a Microsoft account in your browser (device code). Play needs one that owns Minecraft: Java Edition.
+Sign in with a Microsoft account in your browser (device code). Play as a Microsoft account needs one that owns Minecraft: Java Edition. Ely.by signs in from the window's first-run chooser or Settings → Accounts.
 
     horizon-launcher account sign-in
 
@@ -198,7 +199,7 @@ MCP: `account_select`.
 
 ## `horizon-launcher account offline`
 
-Play offline (LAN, offline-mode servers) beside a signed-in account that owns the game: as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game made up.
+Play offline without a Microsoft account: as NAME (kept to switch back to; 3 to 16 letters, digits or _), or as the name the game made up.
 
     horizon-launcher account offline [NAME]
 

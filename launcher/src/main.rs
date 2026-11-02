@@ -88,7 +88,7 @@ use gpui::{
     KeyBinding, KeyDownEvent, Menu, MenuItem, MouseDownEvent, PathPromptOptions, Pixels, Point,
     SharedString, Stateful, Subscription, Window, WindowBounds, WindowOptions,
 };
-use horizon_launcher::account::{self, Accounts, SignIn, SignInState};
+use horizon_launcher::account::{self, Accounts, ElySignIn, ElySignInState, SignIn, SignInState};
 use horizon_launcher::backend::{self, Job, Msg, Release, Running, Settings, Updates};
 use horizon_launcher::build_import;
 use horizon_launcher::i18n::{self, tr, trf};
@@ -383,6 +383,19 @@ struct Launcher {
     owner: Option<bool>,
     /// Play was refused (or Home's Sign in pressed): the owner gate's screen is open.
     owner_screen_open: bool,
+    /// The Ely.by sign-in sheet is open.
+    ely_screen_open: bool,
+    ely_login: line_edit::LineEdit,
+    ely_password: line_edit::LineEdit,
+    ely_code: line_edit::LineEdit,
+    ely_login_focused: bool,
+    ely_password_focused: bool,
+    ely_code_focused: bool,
+    ely_login_focus: FocusHandle,
+    ely_password_focus: FocusHandle,
+    ely_code_focus: FocusHandle,
+    ely_sign_in: Option<ElySignIn>,
+    ely_state: Option<ElySignInState>,
     /// Clicks on the sidebar's launcher version, and whether they revealed the developer options
     /// (`dev_options`) for this run.
     dev_clicks: u8,
@@ -693,6 +706,18 @@ impl Launcher {
             keychain: None,
             owner: None,
             owner_screen_open: false,
+            ely_screen_open: false,
+            ely_login: line_edit::LineEdit::new(String::new(), 128, 30),
+            ely_password: line_edit::LineEdit::new(String::new(), 256, 30),
+            ely_code: line_edit::LineEdit::new(String::new(), 16, 12),
+            ely_login_focused: false,
+            ely_password_focused: false,
+            ely_code_focused: false,
+            ely_login_focus: cx.focus_handle(),
+            ely_password_focus: cx.focus_handle(),
+            ely_code_focus: cx.focus_handle(),
+            ely_sign_in: None,
+            ely_state: None,
             dev_clicks: 0,
             dev_options: false,
             starting_client: None,
@@ -1213,10 +1238,17 @@ impl Launcher {
                         let mut cmd = backend::client_command(&tag);
                         let account::GameSession { file, offline, env } = match session {
                             Ok(pass) => pass,
-                            Err(account::NoOwner) => {
+                            Err(e) if e == account::NoOwner.to_string() => {
                                 self.owner = Some(false);
                                 self.owner_screen_open = true;
                                 self.client_error = Some(account::NoOwner::in_window());
+                                self.starting_pack = None;
+                                self.joining = None;
+                                self.quick_play = None;
+                                continue;
+                            }
+                            Err(e) => {
+                                self.client_error = Some(e);
                                 self.starting_pack = None;
                                 self.joining = None;
                                 self.quick_play = None;
@@ -1569,6 +1601,28 @@ impl Launcher {
                         self.settings.owner_notice_seen = true;
                         self.save_settings();
                     }
+                }
+                changed = true;
+            }
+        }
+        let ely_state = self.ely_sign_in.as_ref().map(ElySignIn::state);
+        if let Some(state) = ely_state {
+            if self.ely_state.as_ref() != Some(&state) {
+                self.ely_state = Some(state.clone());
+                if let ElySignInState::Done(Ok(_)) = &state {
+                    self.accounts = Accounts::load();
+                    self.ely_screen_open = false;
+                    self.owner_screen_open = false;
+                    self.client_error = None;
+                    self.ely_password.set(String::new());
+                    self.ely_code.set(String::new());
+                    if !self.settings.owner_notice_seen {
+                        self.settings.owner_notice_seen = true;
+                        let _ = self.settings.save();
+                    }
+                }
+                if matches!(state, ElySignInState::Done(_) | ElySignInState::TwoFactor) {
+                    self.ely_sign_in = None;
                 }
                 changed = true;
             }
@@ -3979,6 +4033,7 @@ impl Launcher {
             );
         }
         let (accounts, n) = self.account_rows(cx);
+        let (elyby, n) = self.elyby_rows(n, cx);
         let (offline, n) = self.offline_rows(n, cx);
         let group = |label: &'static str, icon: &'static str| {
             section_title(label, icon, &t).mt(px(20.)).mb(px(12.))
@@ -3998,6 +4053,7 @@ impl Launcher {
                     .flex_col()
                     .child(group("Account", "user").mt_0())
                     .child(accounts)
+                    .child(elyby)
                     .child(offline)
                     .child(group("Updates", "reload"))
                     .child(index_row(
@@ -5555,6 +5611,12 @@ impl Render for Launcher {
         }
         if self.asking_consent() {
             root = root.child(self.consent_screen(cx));
+        }
+        if self.asking_provider() {
+            root = root.child(self.provider_screen(cx));
+        }
+        if self.ely_screen_open {
+            root = root.child(self.ely_screen(cx));
         }
         if self.asking_owner() {
             root = root.child(self.owner_screen(cx));

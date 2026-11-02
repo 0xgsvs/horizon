@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} הושמט: הוא צריך את {other}, שהושמט",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "לא נבנה על ה-Horizon שבו אתה משחק ({code}): בנייה משמיטה אותו עד שהיוצר יעדכן אותו",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "במקום שבו אתה נמצא, את ערכת המייסדים מקבלים דרך תשלום חינמי ב-playhorizon.dev. קבל אותה מהחנות: היא פותחת לך את התשלום.",
-  "The founder set can't be claimed from your country.": "אי אפשר לקבל את ערכת המייסדים מהמדינה שלך."
+  "The founder set can't be claimed from your country.": "אי אפשר לקבל את ערכת המייסדים מהמדינה שלך.",
+  "Choose how to play": "Choose how to play",
+  "Ely.by": "Ely.by",
+  "Ely.by account": "Ely.by account",
+  "Enter the two-factor code from your authenticator.": "Enter the two-factor code from your authenticator.",
+  "Other ways to play": "Other ways to play",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.",
+  "Signing in to Ely.by…": "Signing in to Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password."
 }

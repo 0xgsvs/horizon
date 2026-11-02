@@ -14,6 +14,12 @@ impl Launcher {
                     .map_or_else(String::new, |a| a.name.clone()),
                 tr("Microsoft account"),
             ),
+            Player::ElyBy(_) => (
+                self.accounts
+                    .elyby_selected()
+                    .map_or_else(String::new, |a| a.name.clone()),
+                tr("Ely.by account"),
+            ),
             Player::Offline(name) => (name, tr("Offline")),
             Player::GameName => (
                 self.offline_name.clone().unwrap_or_else(|| "Player".into()),
@@ -24,9 +30,7 @@ impl Launcher {
 
     pub(super) fn play_as(&mut self, who: Player) {
         let mut accounts = Accounts::load();
-        let done = accounts
-            .play_as_with(account::store(), who, self.settings.dev_offline)
-            .and_then(|()| accounts.save());
+        let done = accounts.play_as(who).and_then(|()| accounts.save());
         match done {
             Ok(()) => self.accounts = accounts,
             Err(e) => self.sign_in_state = Some(SignInState::Done(Err(e))),
@@ -48,6 +52,12 @@ impl Launcher {
                 )
             })
             .collect();
+        out.extend(
+            self.accounts
+                .elyby
+                .iter()
+                .map(|a| (Player::ElyBy(a.uuid.clone()), a.name.clone(), tr("Ely.by"))),
+        );
         out.extend(
             self.accounts
                 .offline
@@ -176,6 +186,83 @@ impl Launcher {
     /// Enter in the offline name field.
     pub(super) fn offline_name_enter(&mut self) {
         self.add_offline_name();
+    }
+
+    /// Settings' Ely.by accounts: each with Play as and Sign out, then Add account.
+    pub(super) fn elyby_rows(&mut self, mut n: usize, cx: &mut Context<Self>) -> (Div, usize) {
+        let t = self.theme;
+        let mut rows = div().flex().flex_col();
+        let now = self.accounts.player();
+        for (i, account) in self.accounts.elyby.clone().into_iter().enumerate() {
+            let plays = now == Player::ElyBy(account.uuid.clone());
+            let mut actions = div().flex().gap(px(4.));
+            if !plays {
+                let uuid = account.uuid.clone();
+                actions = actions.child(
+                    button(format!("elyby-play-{i}"), "Play as", Kind::Secondary, &t).on_click(
+                        cx.listener(move |this, _: &ClickEvent, _, cx| {
+                            this.play_as(Player::ElyBy(uuid.clone()));
+                            cx.notify();
+                        }),
+                    ),
+                );
+            }
+            let uuid = account.uuid.clone();
+            actions = actions.child(
+                button(format!("elyby-sign-out-{i}"), "Sign out", Kind::Ghost, &t).on_click(
+                    cx.listener(move |this, _: &ClickEvent, _, cx| {
+                        let mut accounts = Accounts::load();
+                        if accounts
+                            .remove_elyby(account::store(), &uuid)
+                            .and_then(|()| accounts.save())
+                            .is_ok()
+                        {
+                            this.accounts = accounts;
+                        }
+                        cx.notify();
+                    }),
+                ),
+            );
+            n += 1;
+            rows = rows.child(slot_row(
+                None,
+                account.name,
+                Some(
+                    div()
+                        .child(tr(if plays {
+                            "Ely.by account · plays"
+                        } else {
+                            "Ely.by account"
+                        }))
+                        .into_any_element(),
+                ),
+                Some(actions.into_any_element()),
+                &t,
+            ));
+        }
+        n += 1;
+        rows = rows.child(index_row(
+            n,
+            tr("Ely.by account"),
+            Some(
+                div()
+                    .child(tr(
+                        "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.",
+                    ))
+                    .into_any_element(),
+            ),
+            Some(
+                button("elyby-add", "Add account", Kind::Secondary, &t)
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.ely_screen_open = true;
+                        this.ely_state = None;
+                        cx.notify();
+                    }))
+                    .into_any_element(),
+            ),
+            &t,
+        ));
+        (rows, n)
     }
 
     /// Settings' rows for the offline names, after the Microsoft accounts: each with Play as

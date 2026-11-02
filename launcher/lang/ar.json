@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "تم استبعاد {name}: يحتاج إلى {other}، الذي تم استبعاده",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "لا يُبنى على إصدار Horizon الذي تلعبه ({code}): يستبعده البناء حتى يحدّثه مؤلفه",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "في بلدك، يُستلَم طقم المؤسسين عبر عملية دفع مجانية على playhorizon.dev. استلمه من المتجر: سيفتح لك صفحة الدفع.",
-  "The founder set can't be claimed from your country.": "لا يمكن استلام طقم المؤسسين من بلدك."
+  "The founder set can't be claimed from your country.": "لا يمكن استلام طقم المؤسسين من بلدك.",
+  "Choose how to play": "اختر طريقة اللعب",
+  "Ely.by account": "حساب Ely.by",
+  "Enter the two-factor code from your authenticator.": "أدخل رمز التحقق بخطوتين من تطبيق المصادقة.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "سجّل الدخول بحساب Ely.by. يمكن للخوادم المتصلة استخدام الحساب عندما تقبل Ely.by.",
+  "Signing in to Ely.by…": "جارٍ تسجيل الدخول إلى Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "استخدم حساب مايكروسوفت أو حساب Ely.by أو العب بلا اتصال. يمكنك تغيير ذلك لاحقًا في الإعدادات.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "تُرسل كلمة المرور إلى authserver.ely.by فقط. يحتفظ المشغّل بالرمز، وليس بكلمة المرور.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "طرق أخرى للعب"
 }

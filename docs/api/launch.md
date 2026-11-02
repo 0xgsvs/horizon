@@ -17,10 +17,11 @@ reference implementation. Proposed in horizon-rust/horizon#3545.
 
 The whole way, from picking a build to playing: [launch-guide.md](launch-guide.md). In short:
 
-1. Start Horizon only for a player signed in with a Microsoft account that owns Minecraft: Java Edition, and
-   hand over that account's session (`--session-stdin`, or `--session-file`), never on the command line. This
-   is the same owner gate `horizon-launcher` applies before every start. Horizon never downloads Mojang's
-   files; a launcher that does downloads them only for that owner.
+1. Start Horizon as the selected player. A Microsoft account must own Minecraft: Java Edition, and its
+   session is handed over (`--session-stdin`, or `--session-file`), never on the command line. Offline
+   players start with no session; Ely.by players get a session file with `user_type: "elyby"`. This is the
+   same choice `horizon-launcher` makes before every start. Horizon never downloads Mojang's files; a
+   launcher that does downloads them only for that owner.
 2. Ask the build what it takes: `horizon-client --launch-api` prints JSON with `launch_api` (the version) and
    `options`. Pass only options it lists: any other is refused with exit code 2.
 3. Start it with a folder per instance:

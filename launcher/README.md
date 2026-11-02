@@ -482,19 +482,22 @@ refuses. Every other command keeps working.
 
 The window, the command line and the MCP server all call the same core, `src/backend.rs`.
 
-## Microsoft accounts
+## Accounts
 
-The launcher starts the game only while a Microsoft account that owns Minecraft: Java Edition is
-signed in, as other launchers do: without one, Play (Home, instances, `horizon-launcher play`, the
-MCP's `play`) says "Sign in with a Microsoft account that owns Minecraft: Java Edition to play"
-and starts nothing. Settings → Accounts signs in: the launcher shows a code, you enter it at
-microsoft.com/link, and the launcher checks that the account owns the game. It asks again at every
-Play, with the token renewal; with no network the last answer stands, and a "doesn't own" blocks
-at once. The account also plays online-mode servers under your own name and skin; offline names
-play LAN and offline-mode servers beside it. The game binary started directly (`horizon-client`,
-`horizon-ctl launch`), the harnesses and the servers don't go through this check. Tokens live in the system keychain (Keychain,
-Credential Manager, or the Secret Service on Linux), never in a log or the command line;
-`accounts.json` in the data folder keeps only names and UUIDs. On Linux without a keychain they go
+On first start the launcher asks **Microsoft account**, **Play offline** or **Ely.by account**.
+Offline and Ely.by need no Microsoft account and start without Microsoft's owner gate. A Microsoft
+account must own Minecraft: Java Edition, as other launchers require: without one, its Play (Home,
+instances, `horizon-launcher play`, the MCP's `play`) says "Sign in with a Microsoft account that
+owns Minecraft: Java Edition to play" and starts nothing. Settings → Accounts signs in: the
+launcher shows a code, you enter it at microsoft.com/link, and the launcher checks that the
+account owns the game. It asks again at every Microsoft Play, with the token renewal; with no
+network the last answer stands, and a "doesn't own" blocks at once. The account also plays
+online-mode servers under your own name and skin; offline names play LAN and offline-mode servers
+beside it. Ely.by accounts use the same sign-in form in Settings → Accounts. The game binary
+started directly (`horizon-client`, `horizon-ctl launch`), the harnesses and the servers don't go
+through this check. Tokens live in the system keychain (Keychain, Credential Manager, or the Secret
+Service on Linux), never in a log or the command line; `accounts.json` in the data folder keeps
+only names and UUIDs. On Linux without a keychain they go
 to `account-secrets.json` in the data folder, encrypted and readable by you only, and back to the keychain once it
 answers; on macOS and Windows without one you stay signed in until the launcher closes. The
 Tailscale access token never goes to that file: without a keychain it lasts until the launcher

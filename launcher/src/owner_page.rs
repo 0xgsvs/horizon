@@ -5,11 +5,360 @@
 use super::*;
 
 impl Launcher {
+    /// The first-run question: Microsoft, offline or Ely.by. It comes before the Microsoft
+    /// owner gate, so an offline or Ely.by player never has to sign in to Microsoft first.
+    pub(crate) fn asking_provider(&self) -> bool {
+        !self.accounts.provider_chosen
+            && self.accounts.accounts.is_empty()
+            && self.accounts.elyby.is_empty()
+            && self.accounts.offline.is_empty()
+            && !self.owner_screen_open
+            && !self.ely_screen_open
+            && !self.settings.owner_notice_seen
+            && !self.asking_consent()
+            && self.opening.is_none()
+    }
+
+    pub(crate) fn provider_screen(&mut self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let t = self.theme;
+        let n = t.night;
+        let card = plate::cut(
+            theme::night::PIXEL_CORNER,
+            2,
+            Some(plate::alpha(n.card, 0.98)),
+            Some((plate::alpha(n.stroke, 2. * n.stroke_alpha), 1.)),
+        )
+        .flex()
+        .flex_col()
+        .gap(px(12.))
+        .w(px(560.))
+        .max_w_full()
+        .p(px(32.))
+        .child(
+            shell::text(theme::night::CAPTION, shell::c(n.muted))
+                .font_weight(FontWeight::SEMIBOLD)
+                .child(tr("Account").to_string()),
+        )
+        .child(
+            shell::text(theme::night::TITLE, shell::c(n.ink))
+                .mb(px(4.))
+                .child(tr("Choose how to play").to_string()),
+        )
+        .child(
+            shell::text(theme::night::UI, shell::c(n.ink_soft)).child(
+                tr("Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.")
+                    .to_string(),
+            ),
+        )
+        .child(
+            button("provider-microsoft", "Microsoft account", Kind::Primary, &t)
+                .w_full()
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.owner_screen_open = true;
+                    this.start_sign_in();
+                    cx.notify();
+                })),
+        )
+        .child(
+            button("provider-offline", "Play offline", Kind::Secondary, &t)
+                .w_full()
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    let mut accounts = Accounts::load();
+                    let done = accounts
+                        .play_as(account::Player::GameName)
+                        .and_then(|()| accounts.save());
+                    match done {
+                        Ok(()) => {
+                            this.accounts = accounts;
+                            this.owner_screen_open = false;
+                            this.ely_screen_open = false;
+                            this.settings.owner_notice_seen = true;
+                            let _ = this.settings.save();
+                        }
+                        Err(e) => this.client_error = Some(e),
+                    }
+                    cx.notify();
+                })),
+        )
+        .child(
+            button("provider-elyby", "Ely.by account", Kind::Secondary, &t)
+                .w_full()
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.ely_screen_open = true;
+                    this.ely_state = None;
+                    cx.notify();
+                })),
+        )
+        .child(div().flex().justify_end().mt(px(6.)).child(
+            shell::action("provider-later", shell::Action::Quiet, &t)
+                .child(shell::label(tr("Not now").to_string()))
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.settings.owner_notice_seen = true;
+                    let _ = this.settings.save();
+                    cx.notify();
+                })),
+        ));
+        self.gate("provider-gate", card)
+    }
+
+    pub(crate) fn ely_screen(&mut self, cx: &mut Context<Self>) -> Stateful<Div> {
+        let t = self.theme;
+        let n = t.night;
+        let login = self
+            .ely_field(
+                "elyby-login",
+                &self.ely_login,
+                self.ely_login_focused,
+                &self.ely_login_focus,
+                "Ely.by login or e-mail",
+                false,
+            )
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                window.focus(&this.ely_login_focus, cx);
+                this.ely_login_focused = true;
+                cx.notify();
+            }))
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                match line_edit::handle(&mut this.ely_login, ev, cx) {
+                    line_edit::Key::Pass => return,
+                    line_edit::Key::Escape => window.blur(cx),
+                    _ => {}
+                }
+                cx.stop_propagation();
+                cx.notify();
+            }));
+        let password = self
+            .ely_field(
+                "elyby-password",
+                &self.ely_password,
+                self.ely_password_focused,
+                &self.ely_password_focus,
+                "Password",
+                true,
+            )
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                window.focus(&this.ely_password_focus, cx);
+                this.ely_password_focused = true;
+                cx.notify();
+            }))
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                match line_edit::handle(&mut this.ely_password, ev, cx) {
+                    line_edit::Key::Pass => return,
+                    line_edit::Key::Escape => window.blur(cx),
+                    _ => {}
+                }
+                cx.stop_propagation();
+                cx.notify();
+            }));
+        let two_factor = self.ely_state == Some(ElySignInState::TwoFactor);
+        let code = two_factor.then(|| {
+            self.ely_field(
+                "elyby-code",
+                &self.ely_code,
+                self.ely_code_focused,
+                &self.ely_code_focus,
+                "Two-factor code",
+                false,
+            )
+            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
+                window.focus(&this.ely_code_focus, cx);
+                this.ely_code_focused = true;
+                cx.notify();
+            }))
+            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
+                match line_edit::handle(&mut this.ely_code, ev, cx) {
+                    line_edit::Key::Pass => return,
+                    line_edit::Key::Escape => window.blur(cx),
+                    _ => {}
+                }
+                cx.stop_propagation();
+                cx.notify();
+            }))
+        });
+        let state = match &self.ely_state {
+            None => String::new(),
+            Some(ElySignInState::Starting) => tr("Signing in to Ely.by…").to_string(),
+            Some(ElySignInState::TwoFactor) => {
+                tr("Enter the two-factor code from your authenticator.").to_string()
+            }
+            Some(ElySignInState::Done(Ok(account))) => {
+                trf("Signed in as {name}.", &[("name", &account.name)])
+            }
+            Some(ElySignInState::Done(Err(e))) => e.clone(),
+        };
+        let busy = matches!(self.ely_state, Some(ElySignInState::Starting));
+        let sign_in = button(
+            "elyby-sign-in",
+            if busy { "Signing in…" } else { "Sign in" },
+            Kind::Primary,
+            &t,
+        );
+        let sign_in = if busy {
+            disabled(sign_in)
+        } else {
+            sign_in.on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                let login = this.ely_login.text().trim().to_string();
+                let password = this.ely_password.text().to_string();
+                if login.is_empty() || password.is_empty() {
+                    this.ely_state = Some(ElySignInState::Done(Err(
+                        "Enter your Ely.by login and password.".into(),
+                    )));
+                    cx.notify();
+                    return;
+                }
+                let code = if this.ely_state == Some(ElySignInState::TwoFactor) {
+                    let code = this.ely_code.text().trim().to_string();
+                    if code.is_empty() {
+                        this.ely_state = Some(ElySignInState::Done(Err(
+                            "Enter the two-factor code.".into(),
+                        )));
+                        cx.notify();
+                        return;
+                    }
+                    Some(code)
+                } else {
+                    None
+                };
+                this.ely_state = Some(ElySignInState::Starting);
+                this.ely_sign_in = Some(ElySignIn::start(login, password, code));
+                cx.notify();
+            }))
+        };
+        let mut body = div()
+            .flex()
+            .flex_col()
+            .gap(px(10.))
+            .child(
+                shell::text(theme::night::CAPTION, shell::c(n.muted))
+                    .font_weight(FontWeight::SEMIBOLD)
+                    .child(tr("Ely.by account").to_string()),
+            )
+            .child(
+                shell::text(theme::night::TITLE, shell::c(n.ink))
+                    .mb(px(4.))
+                    .child(tr("Sign in to play").to_string()),
+            )
+            .child(
+                shell::text(theme::night::UI, shell::c(n.ink_soft)).child(
+                    tr("Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.")
+                        .to_string(),
+                ),
+            )
+            .child(login)
+            .child(password);
+        if let Some(code) = code {
+            body = body.child(code);
+        }
+        if !state.is_empty() {
+            body = body.child(
+                shell::text(
+                    theme::night::UI,
+                    shell::c(if two_factor { n.ink_soft } else { n.muted }),
+                )
+                .child(state),
+            );
+        }
+        let card = plate::cut(
+            theme::night::PIXEL_CORNER,
+            2,
+            Some(plate::alpha(n.card, 0.98)),
+            Some((plate::alpha(n.stroke, 2. * n.stroke_alpha), 1.)),
+        )
+        .flex()
+        .flex_col()
+        .gap(px(8.))
+        .w(px(520.))
+        .max_w_full()
+        .p(px(32.))
+        .child(body)
+        .child(
+            div()
+                .flex()
+                .items_center()
+                .gap(px(10.))
+                .mt(px(14.))
+                .child(sign_in)
+                .child(
+                    shell::action("elyby-back", shell::Action::Quiet, &t)
+                        .child(shell::label(tr("Cancel").to_string()))
+                        .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                            if let Some(sign_in) = &this.ely_sign_in {
+                                sign_in.cancel();
+                            }
+                            this.ely_sign_in = None;
+                            this.ely_screen_open = false;
+                            this.ely_state = None;
+                            this.ely_password.set(String::new());
+                            this.ely_code.set(String::new());
+                            cx.notify();
+                        })),
+                ),
+        );
+        self.gate("ely-gate", card)
+    }
+
+    /// A sheet over the whole window: the launcher dimmed behind a card that takes its scroll.
+    fn gate(&self, id: &'static str, card: Div) -> Stateful<Div> {
+        let n = self.theme.night;
+        div()
+            .id(id)
+            .absolute()
+            .top_0()
+            .left_0()
+            .size_full()
+            .flex()
+            .flex_col()
+            .items_center()
+            .justify_center()
+            .px(px(32.))
+            .py(px(24.))
+            .bg(plate::alpha(n.page, 0.8))
+            .on_scroll(|_, _, cx| cx.stop_propagation())
+            .occlude()
+            .child(card)
+    }
+
+    fn ely_field(
+        &self,
+        id: &'static str,
+        edit: &line_edit::LineEdit,
+        focused: bool,
+        focus: &FocusHandle,
+        placeholder: &'static str,
+        mask: bool,
+    ) -> Stateful<Div> {
+        let t = self.theme;
+        div()
+            .id(id)
+            .track_focus(focus)
+            .flex()
+            .items_center()
+            .w_full()
+            .h(px(34.))
+            .px(px(12.))
+            .overflow_hidden()
+            .border_2()
+            .border_color(if focused { t.accent } else { t.outline })
+            .bg(t.well)
+            .font_family(theme::MONO)
+            .text_size(px(13.))
+            .cursor_text()
+            .child(line_edit::content(
+                edit,
+                &t,
+                focused,
+                false,
+                mask,
+                placeholder,
+            ))
+    }
     /// Whether the screen covers the window: no owner, and either Play was refused or the player
     /// hasn't read it yet. The data question comes first.
     pub(crate) fn asking_owner(&self) -> bool {
         (self.owner_shown() == Some(false) || sign_in_preview())
             && (self.owner_screen_open || !self.settings.owner_notice_seen || sign_in_preview())
+            && !self.asking_provider()
+            && !self.ely_screen_open
             && !self.asking_consent()
             && self.opening.is_none()
     }
@@ -17,6 +366,11 @@ impl Launcher {
     /// `owner` as the window shows it: the developer option that lets offline names play without
     /// an owner (`dev_options`) hides the gate, as if the keychain hadn't answered yet.
     pub(crate) fn owner_shown(&self) -> Option<bool> {
+        if self.accounts.provider_chosen
+            && !matches!(self.accounts.player(), account::Player::Microsoft(_))
+        {
+            return Some(true);
+        }
         match self.owner {
             Some(false) if self.settings.dev_offline => None,
             owner => owner,
@@ -187,6 +541,17 @@ impl Launcher {
             .mt(px(14.))
             .children(main)
             .child(
+                shell::action("owner-other", shell::Action::Quiet, &t)
+                    .child(shell::label(tr("Other ways to play").to_string()))
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.cancel_sign_in();
+                        this.owner_screen_open = false;
+                        this.settings.owner_notice_seen = false;
+                        let _ = this.settings.save();
+                        cx.notify();
+                    })),
+            )
+            .child(
                 shell::action("owner-later", shell::Action::Quiet, &t)
                     .child(shell::label(tr("Not now").to_string()))
                     .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
@@ -212,22 +577,7 @@ impl Launcher {
         .child(answers)
         .children(waiting);
         // The sky stays behind, dimmed: the sheet is over the launcher, not instead of it.
-        div()
-            .id("owner-gate")
-            .absolute()
-            .top_0()
-            .left_0()
-            .size_full()
-            .flex()
-            .flex_col()
-            .items_center()
-            .justify_center()
-            .px(px(32.))
-            .py(px(24.))
-            .bg(plate::alpha(n.page, 0.8))
-            .on_scroll(|_, _, cx| cx.stop_propagation())
-            .occlude()
-            .child(card)
+        self.gate("owner-gate", card)
     }
 
     /// The screen in the glass look: a dialog plate over the dimmed, blurred launcher (the

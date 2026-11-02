@@ -729,8 +729,9 @@ enum Cmd {
     },
     /// Prepare a version's resources from your own Minecraft install, or from Mojang
     Prepare {
-        /// The game folder of the official launcher, Prism Launcher, MultiMC, the Modrinth App,
-        /// ATLauncher or GDLauncher (default: the launcher's, then every launcher's default)
+        /// The game folder of the official launcher, Prism Launcher, PineconeMC, MultiMC, the
+        /// Modrinth App, ATLauncher or GDLauncher (default: the launcher's, then every launcher's
+        /// default)
         #[arg(long, conflicts_with = "download")]
         minecraft: Option<PathBuf>,
         /// Download Minecraft from Mojang for the signed-in account that owns it, instead of
@@ -1520,7 +1521,7 @@ fn execute(command: Cmd, as_json: bool) -> Result<(), String> {
                 None => None,
             };
             if let Some(who) = &who {
-                accounts.play_as(account::store(), who.clone())?;
+                accounts.play_as(who.clone())?;
             }
             let mut cmd =
                 backend::client_as(&instance.resolve_version(version.as_deref())?, who.as_ref())?;
@@ -2044,7 +2045,7 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
                 ),
                 (None, None) => return Err(find(&accounts, &who).unwrap_err()),
             };
-            accounts.play_as(account::store(), player)?;
+            accounts.play_as(player)?;
             accounts.save()?;
             println!("The game plays as {name}.");
         }
@@ -2053,7 +2054,7 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
                 Some(n) => account::Player::Offline(n),
                 None => account::Player::GameName,
             };
-            accounts.play_as(account::store(), player)?;
+            accounts.play_as(player)?;
             accounts.save()?;
             match accounts.name_arg() {
                 Some(n) => println!("The game plays offline as {n}."),

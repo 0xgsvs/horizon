@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} el xe stà lasà fora: el ga bisogno de {other}, che el xe stà lasà fora",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "No'l se compila sul Horizon che te zughi ({code}): na compilazion lo lasa fora fin che el so autor no lo ajorna",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "Dove che te si, el set dei fondadori se lo riscata co un pagamento gratis su playhorizon.dev. Riscatelo dal Negozio: el te verze el pagamento.",
-  "The founder set can't be claimed from your country.": "El set dei fondadori no se pol riscatarlo dal to paese."
+  "The founder set can't be claimed from your country.": "El set dei fondadori no se pol riscatarlo dal to paese.",
+  "Choose how to play": "Choose how to play",
+  "Ely.by": "Ely.by",
+  "Ely.by account": "Ely.by account",
+  "Enter the two-factor code from your authenticator.": "Enter the two-factor code from your authenticator.",
+  "Other ways to play": "Other ways to play",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.",
+  "Signing in to Ely.by…": "Signing in to Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password."
 }

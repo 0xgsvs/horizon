@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} пропущено: йому потрібен {other}, який пропущено",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "Не збирається на Horizon, у який ви граєте ({code}): збирання пропустить його, доки автор не оновить",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "Там, де ви є, набір засновника отримують через безкоштовне оформлення на playhorizon.dev. Отримайте його в Крамниці: вона сама відкриє оформлення.",
-  "The founder set can't be claimed from your country.": "Набір засновника не можна отримати з вашої країни."
+  "The founder set can't be claimed from your country.": "Набір засновника не можна отримати з вашої країни.",
+  "Choose how to play": "Виберіть спосіб гри",
+  "Ely.by account": "Акаунт Ely.by",
+  "Enter the two-factor code from your authenticator.": "Введіть код двофакторної аутентифікації з застосунку.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Увійдіть зі своїм логіном Ely.by. Онлайн-сервери можуть використовувати акаунт, якщо підтримують Ely.by.",
+  "Signing in to Ely.by…": "Вхід до Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Використовуйте акаунт Microsoft, акаунт Ely.by або грайте офлайн. Це можна змінити пізніше в налаштуваннях.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Пароль надсилається лише на authserver.ely.by. Лаунчер зберігає токен, але ніколи пароль.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "Інші способи гри"
 }

@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} a été laissé de côté : il a besoin de {other}, laissé de côté",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "Ne se compile pas sur le Horizon auquel vous jouez ({code}) : une compilation le laisse de côté jusqu'à ce que son auteur le mette à jour",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "Là où vous êtes, le set fondateur se réclame par un paiement gratuit sur playhorizon.dev. Réclamez-le depuis la Boutique : elle ouvre le paiement pour vous.",
-  "The founder set can't be claimed from your country.": "Le set fondateur ne peut pas être réclamé depuis votre pays."
+  "The founder set can't be claimed from your country.": "Le set fondateur ne peut pas être réclamé depuis votre pays.",
+  "Choose how to play": "Choisissez comment jouer",
+  "Ely.by account": "Compte Ely.by",
+  "Enter the two-factor code from your authenticator.": "Saisissez le code à deux facteurs de votre application d’authentification.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Connectez-vous avec votre identifiant Ely.by. Les serveurs en ligne peuvent utiliser le compte lorsqu’ils acceptent Ely.by.",
+  "Signing in to Ely.by…": "Connexion à Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Utilisez un compte Microsoft, un compte Ely.by ou jouez hors ligne. Vous pourrez changer plus tard dans les paramètres.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Votre mot de passe est envoyé uniquement à authserver.ely.by. Le lanceur conserve le jeton, jamais le mot de passe.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "Autres façons de jouer"
 }

@@ -39,6 +39,14 @@ impl Launcher {
                     .unwrap_or_default(),
                 (Tone::Live, tr("Microsoft account · online servers too")),
             ),
+            Player::ElyBy(uuid) => (
+                Some(uuid.clone()),
+                self.accounts
+                    .elyby_selected()
+                    .map(|a| a.name.clone())
+                    .unwrap_or_default(),
+                (Tone::Live, tr("Ely.by")),
+            ),
             Player::Offline(name) => (
                 None,
                 name.clone(),

@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "{name} пропущен: ему нужен {other}, который пропущен",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "Не собирается на Horizon, в который вы играете ({code}): сборка пропустит его, пока автор не обновит",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "В вашей стране набор основателя получают через бесплатное оформление на playhorizon.dev. Получите его в Магазине: он сам откроет оформление.",
-  "The founder set can't be claimed from your country.": "Набор основателя нельзя получить из вашей страны."
+  "The founder set can't be claimed from your country.": "Набор основателя нельзя получить из вашей страны.",
+  "Choose how to play": "Выберите способ игры",
+  "Ely.by account": "Аккаунт Ely.by",
+  "Enter the two-factor code from your authenticator.": "Введите код двухфакторной аутентификации из приложения.",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Войдите с логином Ely.by. Онлайн-серверы могут использовать аккаунт, если поддерживают Ely.by.",
+  "Signing in to Ely.by…": "Вход в Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Используйте аккаунт Microsoft, аккаунт Ely.by или играйте офлайн. Это можно изменить позже в настройках.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "Пароль отправляется только на authserver.ely.by. Лаунчер хранит токен, но никогда пароль.",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "Другие способы игры"
 }

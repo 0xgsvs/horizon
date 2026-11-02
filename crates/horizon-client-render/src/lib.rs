@@ -37,6 +37,7 @@ pub mod crash;
 pub mod datapack;
 pub mod dynamic_light;
 pub mod effects;
+pub mod elyby;
 pub mod environment;
 pub mod extras;
 pub mod fast_hash;

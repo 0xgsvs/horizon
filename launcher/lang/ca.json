@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "S'ha deixat fora {name}: necessita {other}, que s'ha deixat fora",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "No es compila a l'Horizon que jugues ({code}): la compilació el deixa fora fins que el seu autor l'actualitzi",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "On ets, el conjunt de fundadors es reclama amb un pagament gratuït a playhorizon.dev. Reclama'l des de la Botiga: t'obre el pagament.",
-  "The founder set can't be claimed from your country.": "El conjunt de fundadors no es pot reclamar des del teu país."
+  "The founder set can't be claimed from your country.": "El conjunt de fundadors no es pot reclamar des del teu país.",
+  "Choose how to play": "Tria com jugar",
+  "Ely.by": "Ely.by",
+  "Ely.by account": "Compte d'Ely.by",
+  "Enter the two-factor code from your authenticator.": "Introdueix el codi de doble factor del teu autenticador.",
+  "Other ways to play": "Altres maneres de jugar",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "Inicia la sessió amb el teu usuari d'Ely.by. Els servidors en línia poden usar el compte quan accepten Ely.by.",
+  "Signing in to Ely.by…": "S'està iniciant la sessió a Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "Usa un compte de Microsoft, un compte d'Ely.by o juga fora de línia. Ho pots canviar més tard a la configuració.",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "La teva contrasenya només s'envia a authserver.ely.by. El llançador desa el testimoni, mai la contrasenya."
 }

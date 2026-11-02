@@ -1223,5 +1223,14 @@
   "{name} was left out: it needs {other}, which was left out": "已略过 {name}：它需要 {other}，而后者已被略过",
   "Doesn't build on the Horizon you play ({code}): a build leaves it out until its author updates it": "无法在你玩的 Horizon 上构建（{code}）：在作者更新之前，构建会略过它",
   "Where you are, the founder set is claimed through a free checkout on playhorizon.dev. Claim it from the Shop: it opens the checkout for you.": "在你所在的地区，创始者套装需通过 playhorizon.dev 上的免费结账领取。请在商店中领取：商店会为你打开结账页面。",
-  "The founder set can't be claimed from your country.": "你所在的国家无法领取创始者套装。"
+  "The founder set can't be claimed from your country.": "你所在的国家无法领取创始者套装。",
+  "Choose how to play": "选择游玩方式",
+  "Ely.by account": "Ely.by 账户",
+  "Enter the two-factor code from your authenticator.": "输入验证器中的双重验证码。",
+  "Sign in with your Ely.by login. Online servers can use the account when they accept Ely.by.": "使用 Ely.by 登录名登录。支持 Ely.by 的在线服务器可以使用该账户。",
+  "Signing in to Ely.by…": "正在登录 Ely.by…",
+  "Use a Microsoft account, an Ely.by account, or play offline. You can change this later in Settings.": "使用 Microsoft 账户、Ely.by 账户或离线游玩。之后可在设置中更改。",
+  "Your password goes only to authserver.ely.by. The launcher keeps the token, never the password.": "密码只会发送到 authserver.ely.by。启动器保存令牌，绝不保存密码。",
+  "Ely.by": "Ely.by",
+  "Other ways to play": "其他游玩方式"
 }

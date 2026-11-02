@@ -7,11 +7,13 @@
 //! output.
 //!
 //! The owner gate ([`launch`]): the launcher starts the game only while an account in it owns
-//! Minecraft: Java Edition, as other launchers do, and the game plays as the selected account.
-//! The game binary itself, its harnesses and the servers don't go through the launcher's gate.
+//! Minecraft: Java Edition, as other launchers do, and the game plays as the selected account. An
+//! Ely.by account ([`elyby`]) plays without a Microsoft account. The game binary itself, its
+//! harnesses and the servers don't go through the launcher's gate.
 //!
 //! The Azure app (client ID) is Horizon's own and is configuration: `HORIZON_MSA_CLIENT_ID` at
 //! build time, or at run time to override it. Without one, sign-in says it is not configured.
+pub mod elyby;
 pub mod session;
 
 use serde_json::{json, Value};
@@ -1749,6 +1751,51 @@ pub struct Accounts {
     /// `offline_selected` and `looks` are dropped on read.
     #[serde(default, rename = "offline", skip_serializing)]
     old_offline: Vec<String>,
+    /// Ely.by accounts, kept beside the Microsoft ones.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub elyby: Vec<ElyByAccount>,
+    /// The UUID of the Ely.by account that plays, when none of `accounts` does.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub elyby_selected: Option<String>,
+    /// The player chose Microsoft, Ely.by or offline at first start.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub provider_chosen: bool,
+    /// The player chose to play offline, without an account (single player, LAN and
+    /// offline-mode servers, under the name the game made up).
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub offline_play: bool,
+}
+
+/// An Ely.by profile, as the launcher shows it (no tokens).
+#[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct ElyByAccount {
+    pub uuid: String,
+    pub name: String,
+}
+
+/// Who plays, as the quick switch lists them.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Player {
+    /// A Microsoft account, by UUID.
+    Microsoft(String),
+    /// An Ely.by account, by UUID.
+    ElyBy(String),
+    /// No account: the game's own made-up name, online servers refused.
+    Offline,
+}
+
+impl Player {
+    /// The UUID the account is known by; empty for the offline player, who has none.
+    pub fn uuid(&self) -> &str {
+        match self {
+            Player::Microsoft(uuid) | Player::ElyBy(uuid) => uuid,
+            Player::Offline => "",
+        }
+    }
+}
+
+fn elyby_key(uuid: &str) -> String {
+    format!("elyby:{uuid}")
 }
 
 /// The secrets an account keeps in `store`, if it still has them there.
@@ -1758,6 +1805,19 @@ fn secrets_in(store: &dyn SecretStore, uuid: &str) -> Option<Secrets> {
         .ok()
         .flatten()
         .and_then(|s| serde_json::from_str(&s).ok())
+}
+
+/// The name the game made up for the offline player, kept in `horizon-player.txt` next to
+/// `options.txt` in `home`; none before the game has run there.
+pub fn offline_game_name(home: &Path) -> Option<String> {
+    let text = std::fs::read_to_string(home.join("horizon-player.txt")).ok()?;
+    let name = text
+        .lines()
+        .find_map(|line| line.trim_end_matches('\r').strip_prefix("name:"))?
+        .trim();
+    ((3..=16).contains(&name.chars().count())
+        && name.chars().all(|c| c.is_ascii_alphanumeric() || c == '_'))
+    .then(|| name.to_string())
 }
 
 impl Accounts {
@@ -1875,12 +1935,103 @@ impl Accounts {
             .any(|a| secrets_in(store, &a.uuid).is_some_and(|s| s.owns))
     }
 
-    /// Plays as the signed-in account `uuid`.
-    pub fn play_as(&mut self, uuid: &str) -> Result<(), String> {
-        if !self.accounts.iter().any(|a| a.uuid == uuid) {
-            return Err("That account isn't signed in.".into());
+    /// Who plays now: the selected Microsoft account, else the Ely.by one, else the offline
+    /// player when the player chose it.
+    pub fn player(&self) -> Option<Player> {
+        if let Some(account) = self.selected() {
+            return Some(Player::Microsoft(account.uuid.clone()));
         }
-        self.selected = Some(uuid.to_string());
+        if let Some(account) = self.elyby_selected() {
+            return Some(Player::ElyBy(account.uuid.clone()));
+        }
+        self.offline_play.then_some(Player::Offline)
+    }
+
+    /// The Ely.by account that plays, when one does.
+    pub fn elyby_selected(&self) -> Option<&ElyByAccount> {
+        let uuid = self.elyby_selected.as_ref()?;
+        self.elyby.iter().find(|a| &a.uuid == uuid)
+    }
+
+    /// Keeps a new Ely.by account, its secrets in the store, and plays as it.
+    pub fn add_elyby(
+        &mut self,
+        store: &dyn SecretStore,
+        profile: elyby::Profile,
+        secrets: &elyby::Secrets,
+    ) -> Result<(), String> {
+        let _operation = session::lock(store)?;
+        self.keep_elyby_secrets(store, &profile.uuid, secrets)?;
+        self.elyby.retain(|a| a.uuid != profile.uuid);
+        self.elyby.push(ElyByAccount {
+            uuid: profile.uuid.clone(),
+            name: profile.name,
+        });
+        self.selected = None;
+        self.elyby_selected = Some(profile.uuid);
+        self.offline_play = false;
+        self.provider_chosen = true;
+        Ok(())
+    }
+
+    /// An Ely.by account's secrets, if the keychain still has them.
+    pub fn elyby_secrets(&self, store: &dyn SecretStore, uuid: &str) -> Option<elyby::Secrets> {
+        store
+            .get(&elyby_key(uuid))
+            .ok()
+            .flatten()
+            .and_then(|s| serde_json::from_str(&s).ok())
+    }
+
+    fn keep_elyby_secrets(
+        &self,
+        store: &dyn SecretStore,
+        uuid: &str,
+        secrets: &elyby::Secrets,
+    ) -> Result<(), String> {
+        store.set(
+            &elyby_key(uuid),
+            &serde_json::to_string(secrets).map_err(|e| e.to_string())?,
+        )
+    }
+
+    /// Sign out of an Ely.by account: the secrets leave the keychain, the account the list.
+    pub fn remove_elyby(&mut self, store: &dyn SecretStore, uuid: &str) -> Result<(), String> {
+        let _operation = session::lock(store)?;
+        store.delete(&elyby_key(uuid))?;
+        self.elyby.retain(|a| a.uuid != uuid);
+        if self.elyby_selected.as_deref() == Some(uuid) {
+            self.elyby_selected = None;
+        }
+        Ok(())
+    }
+
+    /// Plays as `who`: a signed-in Microsoft or Ely.by account, or offline.
+    pub fn play_as(&mut self, who: Player) -> Result<(), String> {
+        match who {
+            Player::Microsoft(uuid) => {
+                if !self.accounts.iter().any(|a| a.uuid == uuid) {
+                    return Err("That account isn't signed in.".into());
+                }
+                self.selected = Some(uuid);
+                self.elyby_selected = None;
+                self.offline_play = false;
+            }
+            Player::ElyBy(uuid) => {
+                if !self.elyby.iter().any(|a| a.uuid == uuid) {
+                    return Err("That Ely.by account isn't signed in.".into());
+                }
+                self.selected = None;
+                self.elyby_selected = Some(uuid);
+                self.offline_play = false;
+            }
+            Player::Offline => {
+                self.selected = None;
+                self.elyby_selected = None;
+                self.offline_play = true;
+            }
+        }
+        self.provider_chosen = true;
         Ok(())
     }
 
@@ -2090,6 +2241,38 @@ pub fn write_session_file(
     account: &Account,
     secrets: &Secrets,
 ) -> Result<PathBuf, String> {
+    write_session(
+        dir,
+        json!({
+            "name": account.name,
+            "uuid": account.uuid,
+            "access_token": secrets.minecraft_token,
+            "user_type": "msa",
+            "xuid": secrets.xuid,
+        }),
+    )
+}
+
+/// The game's session file for an Ely.by account: the same fields as Microsoft's, with
+/// `user_type: "elyby"`, so the game joins through the Ely.by authserver.
+pub fn write_elyby_session_file(
+    dir: &Path,
+    name: &str,
+    uuid: &str,
+    access_token: &str,
+) -> Result<PathBuf, String> {
+    write_session(
+        dir,
+        json!({
+            "name": name,
+            "uuid": uuid,
+            "access_token": access_token,
+            "user_type": "elyby",
+        }),
+    )
+}
+
+fn write_session(dir: &Path, body: Value) -> Result<PathBuf, String> {
     std::fs::create_dir_all(dir).map_err(|e| e.to_string())?;
     // The folder too is this user's only (the files already are).
     #[cfg(unix)]
@@ -2120,13 +2303,6 @@ pub fn write_session_file(
     #[cfg(unix)]
     std::os::unix::fs::OpenOptionsExt::mode(&mut options, 0o600);
     let mut file = options.open(&path).map_err(|e| e.to_string())?;
-    let body = json!({
-        "name": account.name,
-        "uuid": account.uuid,
-        "access_token": secrets.minecraft_token,
-        "user_type": "msa",
-        "xuid": secrets.xuid,
-    });
     std::io::Write::write_all(&mut file, body.to_string().as_bytes()).map_err(|e| e.to_string())?;
     Ok(path)
 }
@@ -2315,10 +2491,83 @@ pub struct GameSession {
     pub env: Vec<(&'static str, String)>,
 }
 
+/// Where an Ely.by sign-in is. `TwoFactor` keeps the login and password for the next try.
+#[derive(Clone, Debug, PartialEq)]
+pub enum ElySignInState {
+    Starting,
+    TwoFactor,
+    Done(Result<ElyByAccount, String>),
+}
+
+/// An Ely.by sign-in on its own thread, from the login and password to the saved account.
+pub struct ElySignIn {
+    state: std::sync::Arc<Mutex<ElySignInState>>,
+    cancel: std::sync::Arc<std::sync::atomic::AtomicBool>,
+}
+
+impl ElySignIn {
+    pub fn start(login: String, password: String, two_factor: Option<String>) -> Self {
+        use std::sync::atomic::Ordering;
+        let state = std::sync::Arc::new(Mutex::new(ElySignInState::Starting));
+        let cancel = std::sync::Arc::new(std::sync::atomic::AtomicBool::new(false));
+        let (thread_state, thread_cancel) = (state.clone(), cancel.clone());
+        std::thread::spawn(move || {
+            let set = |s| *thread_state.lock().unwrap() = s;
+            let (profile, secrets) =
+                match elyby::authenticate(&login, &password, two_factor.as_deref()) {
+                    Ok(found) => found,
+                    Err(elyby::Error::TwoFactorRequired) => {
+                        set(ElySignInState::TwoFactor);
+                        return;
+                    }
+                    Err(e) => {
+                        set(ElySignInState::Done(Err(e.to_string())));
+                        return;
+                    }
+                };
+            if thread_cancel.load(Ordering::Relaxed) {
+                set(ElySignInState::Done(Err("Sign-in cancelled.".into())));
+                return;
+            }
+            let store = store();
+            let mut accounts = Accounts::load();
+            let saved = accounts
+                .add_elyby(store, profile.clone(), &secrets)
+                .and_then(|()| accounts.save());
+            match saved {
+                Ok(()) => set(ElySignInState::Done(Ok(ElyByAccount {
+                    uuid: profile.uuid,
+                    name: profile.name,
+                }))),
+                Err(e) => set(ElySignInState::Done(Err(e))),
+            }
+        });
+        Self { state, cancel }
+    }
+
+    pub fn state(&self) -> ElySignInState {
+        self.state.lock().unwrap().clone()
+    }
+
+    pub fn cancel(&self) {
+        self.cancel
+            .store(true, std::sync::atomic::Ordering::Relaxed);
+    }
+}
+
 /// The owner gate for the game about to start, then the selected account's session in a file
 /// for it, and the other accounts' for its splitscreen players.
 pub fn session_for_game(game_home: &Path) -> Result<GameSession, NoOwner> {
     let mut accounts = Accounts::load();
+    if let Some(account) = accounts.elyby_selected() {
+        return elyby_session_for_game(game_home, &accounts, account)
+            .map_err(|e| NoOwner { keyring: Some(e) });
+    }
+    // Offline: no session file, so the game plays under the name it made up; Play has no
+    // Microsoft owner gate to pass.
+    if accounts.offline_play {
+        return Ok(GameSession::default());
+    }
     let pass = launch_for_game(
         &Endpoints::live(),
         client_id().as_deref(),
@@ -2334,6 +2583,38 @@ pub fn session_for_game(game_home: &Path) -> Result<GameSession, NoOwner> {
         eprintln!("Horizon: the accounts are not saved: {e}");
     }
     Ok(session_file(game_home, pass, env))
+}
+
+/// The game's session for the Ely.by account that plays: a renewed token when the services
+/// answer, the kept one when they don't, in the file the game reads once.
+fn elyby_session_for_game(
+    game_home: &Path,
+    accounts: &Accounts,
+    account: &ElyByAccount,
+) -> Result<GameSession, String> {
+    let secrets = accounts
+        .elyby_secrets(store(), &account.uuid)
+        .ok_or_else(|| "The Ely.by sign-in is missing. Sign in again.".to_string())?;
+    let profile = elyby::Profile {
+        uuid: account.uuid.clone(),
+        name: account.name.clone(),
+    };
+    let (profile, secrets) = match elyby::restore(&profile, &secrets) {
+        Ok(fresh) => fresh,
+        Err(elyby::Error::Unavailable) => (profile, secrets),
+        Err(e) => return Err(e.to_string()),
+    };
+    let _ = accounts.keep_elyby_secrets(store(), &account.uuid, &secrets);
+    let file = write_elyby_session_file(
+        &game_home.join("sessions"),
+        &profile.name,
+        &profile.uuid,
+        &secrets.access_token,
+    )?;
+    Ok(GameSession {
+        file: Some(file),
+        ..GameSession::default()
+    })
 }
 
 /// [`session_for_game`] for one launch as `who` (`play --account`, a signed-in account): who
@@ -2373,10 +2654,12 @@ fn launch_as(
     who: &str,
 ) -> Result<Launch, String> {
     let chosen = accounts.selected.clone();
+    let chosen_elyby = accounts.elyby_selected.clone();
     let pass = accounts
-        .play_as(who)
+        .play_as(Player::Microsoft(who.to_string()))
         .and_then(|()| launch_for_game(ep, client_id, store, accounts).map_err(|e| e.to_string()));
     accounts.selected = chosen;
+    accounts.elyby_selected = chosen_elyby;
     pass
 }
 
@@ -2581,5 +2864,7 @@ fn java_player_with(
     })
 }
 
+#[cfg(test)]
+mod http;
 #[cfg(test)]
 mod tests;

@@ -357,6 +357,12 @@ impl Render for Launcher {
         } else if self.asking_consent() {
             root = root.child(self.consent_screen(cx));
         }
+        if self.asking_provider() {
+            root = root.child(self.provider_screen(cx));
+        }
+        if self.ely_screen_open || owner_page::page_preview("elyby") {
+            root = root.child(self.ely_screen(cx));
+        }
         if self.asking_owner() {
             root = root.child(self.owner_screen(cx));
         }

@@ -188,6 +188,7 @@ impl Launcher {
             );
         }
         let (accounts, n) = self.account_rows(cx);
+        let (elyby, n) = self.elyby_rows(n, cx);
         let group = |label: &'static str, icon: &'static str| {
             section_title(label, icon, &t).mt(px(20.)).mb(px(12.))
         };
@@ -206,6 +207,7 @@ impl Launcher {
                     .flex_col()
                     .child(group("Account", "user").mt_0())
                     .child(accounts)
+                    .child(elyby)
                     .child(group("Updates", "reload"))
                     .child(index_row(n + 1, "Horizon", Some(plain(&horizon)), horizon_action, &t))
                     .child(index_row(
@@ -595,6 +597,25 @@ impl Launcher {
             action,
             &t,
         ));
+        n += 1;
+        let offline_detail = div()
+            .child(tr(
+                "Offline plays single player and LAN worlds under the game's own name (online servers need an account).",
+            ))
+            .into_any_element();
+        let offline_action = button("play-offline-row", "Play offline", Kind::Ghost, &t)
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.play_as(&account::Player::Offline);
+                cx.notify();
+            }))
+            .into_any_element();
+        rows = rows.child(index_row(
+            n,
+            tr("Play offline"),
+            Some(offline_detail),
+            Some(offline_action),
+            &t,
+        ));
         (rows, n)
     }
 
@@ -613,11 +634,7 @@ impl Launcher {
                 actions = actions.child(
                     button(format!("offline-{i}"), "Play offline", Kind::Ghost, &t).on_click(
                         cx.listener(|this, _: &ClickEvent, _, cx| {
-                            let mut accounts = Accounts::load();
-                            accounts.selected = None;
-                            if accounts.save().is_ok() {
-                                this.accounts = accounts;
-                            }
+                            this.play_as(&account::Player::Offline);
                             cx.notify();
                         }),
                     ),
@@ -627,7 +644,8 @@ impl Launcher {
                 actions = actions.child(
                     button(format!("select-{i}"), "Play as", Kind::Secondary, &t).on_click(
                         cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            this.play_as(&uuid);
+                            let who = account::Player::Microsoft(uuid.clone());
+                            this.play_as(&who);
                             cx.notify();
                         }),
                     ),

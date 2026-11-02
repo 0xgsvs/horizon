@@ -1,7 +1,7 @@
 //! The sign-in chain against a local mock of the Microsoft, Xbox Live and Minecraft endpoints
 //! (recorded response shapes, mock tokens only), and the keychain abstraction in memory.
 use super::*;
-use std::io::{BufRead, BufReader, Read, Write};
+use std::io::{BufRead, BufReader, Write};
 use std::net::TcpListener;
 use std::sync::Arc;
 
@@ -148,56 +148,16 @@ fn route(mock: &mut Mock, method: &str, path: &str, auth: &str, body: &str) -> (
     }
 }
 
-/// A one-thread HTTP/1.1 server: one request per connection.
 fn serve(mock: Arc<Mutex<Mock>>) -> Endpoints {
-    let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-    let base = format!("http://{}", listener.local_addr().unwrap());
-    std::thread::spawn(move || {
-        for stream in listener.incoming() {
-            let Ok(mut stream) = stream else { continue };
-            let mut reader = BufReader::new(stream.try_clone().unwrap());
-            let mut line = String::new();
-            if reader.read_line(&mut line).is_err() {
-                continue;
-            }
-            let mut parts = line.split_whitespace();
-            let (method, path) = (
-                parts.next().unwrap_or("").to_owned(),
-                parts.next().unwrap_or("").to_owned(),
-            );
-            let (mut length, mut auth) = (0, String::new());
-            loop {
-                let mut header = String::new();
-                reader.read_line(&mut header).unwrap();
-                let header = header.trim_end();
-                if header.is_empty() {
-                    break;
-                }
-                let (k, v) = header.split_once(':').unwrap();
-                match k.to_ascii_lowercase().as_str() {
-                    "content-length" => length = v.trim().parse().unwrap(),
-                    "authorization" => auth = v.trim().to_owned(),
-                    _ => {}
-                }
-            }
-            let mut body = vec![0; length];
-            reader.read_exact(&mut body).unwrap();
-            let body = String::from_utf8(body).unwrap();
-            let (status, text) = {
-                let mut m = mock.lock().unwrap();
-                // A bare `GET /` is a local tool probing every new port (T3 Code does, on the Mac
-                // mini), not the launcher: no endpoint here is the root.
-                if (method.as_str(), path.as_str()) != ("GET", "/") {
-                    m.log.push((method.clone(), path.clone(), body.clone()));
-                }
-                route(&mut m, &method, &path, &auth, &body)
-            };
-            let _ = write!(
-                stream,
-                "HTTP/1.1 {status} X\r\nContent-Type: application/json\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{text}",
-                text.len()
-            );
+    let base = super::http::serve(usize::MAX, move |method, path, auth, body| {
+        let mut m = mock.lock().unwrap();
+        // A bare `GET /` is a local tool probing every new port (T3 Code does, on the Mac
+        // mini), not the launcher: no endpoint here is the root.
+        if (method, path) != ("GET", "/") {
+            m.log
+                .push((method.to_owned(), path.to_owned(), body.to_owned()));
         }
+        route(&mut m, method, path, auth, body)
     });
     Endpoints {
         microsoft: format!("{base}/ms"),
@@ -710,7 +670,7 @@ fn the_game_plays_only_as_an_account_that_owns_it() {
         skin: None,
         cape: None,
     });
-    accounts.play_as("other").unwrap();
+    accounts.play_as(Player::Microsoft("other".into())).unwrap();
     let refused = launch_for_game(&ep, Some("test-client"), &store, &mut accounts).unwrap_err();
     assert!(refused
         .to_string()
@@ -720,6 +680,43 @@ fn the_game_plays_only_as_an_account_that_owns_it() {
     let mut accounts = signed_in(&store, &secrets("mc-token", true));
     let refused = launch_for_game(&ep, Some("test-client"), &store, &mut accounts);
     assert_eq!(refused.unwrap_err(), NoOwner::default());
+}
+
+#[test]
+fn elyby_accounts_are_kept_and_write_a_session_file() {
+    let store = MemoryStore::default();
+    let mut accounts = Accounts::default();
+    let profile = elyby::Profile {
+        uuid: "069a79f444e94726a5befca90e38aaf5".into(),
+        name: "Notch".into(),
+    };
+    let tokens = elyby::Secrets {
+        access_token: "ely-token".into(),
+        client_token: "client".into(),
+    };
+    accounts
+        .add_elyby(&store, profile.clone(), &tokens)
+        .unwrap();
+    assert_eq!(accounts.player(), Some(Player::ElyBy(profile.uuid.clone())));
+    assert!(accounts.provider_chosen);
+    assert_eq!(
+        accounts
+            .elyby_secrets(&store, &profile.uuid)
+            .unwrap()
+            .access_token,
+        "ely-token"
+    );
+    let dir = std::env::temp_dir().join(format!("horizon-elyby-session-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let file = write_elyby_session_file(&dir, &profile.name, &profile.uuid, "ely-token").unwrap();
+    let body: Value = serde_json::from_str(&std::fs::read_to_string(file).unwrap()).unwrap();
+    assert_eq!(body["user_type"], "elyby");
+    assert_eq!(body["access_token"], "ely-token");
+    assert_eq!(body["uuid"], profile.uuid);
+    let _ = std::fs::remove_dir_all(&dir);
+    accounts.remove_elyby(&store, &profile.uuid).unwrap();
+    assert_eq!(accounts.player(), None);
+    assert!(accounts.elyby.is_empty());
 }
 
 #[test]
@@ -1171,9 +1168,9 @@ fn play_as_picks_a_signed_in_account() {
         }],
         ..Accounts::default()
     };
-    a.play_as("abc").unwrap();
+    a.play_as(Player::Microsoft("abc".into())).unwrap();
     assert_eq!(a.selected().unwrap().name, "Ludo");
-    assert!(a.play_as("zzz").is_err());
+    assert!(a.play_as(Player::Microsoft("zzz".into())).is_err());
     assert_eq!(a.selected.as_deref(), Some("abc"));
     // An accounts.json written now has nothing but the accounts and who plays.
     assert_eq!(
@@ -2581,5 +2578,42 @@ fn a_launch_saving_late_keeps_sign_ins_and_outs_made_meanwhile() {
         .map(|e| e.unwrap().file_name())
         .collect();
     assert_eq!(names, [std::ffi::OsString::from("accounts.json")]);
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn offline_is_a_choice_kept_beside_the_accounts() {
+    let dir = std::env::temp_dir().join(format!("horizon-offline-choice-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let file = dir.join("accounts.json");
+    let mut accounts = Accounts {
+        accounts: vec![notch()],
+        ..Default::default()
+    };
+    accounts.play_as(Player::Offline).unwrap();
+    assert_eq!(accounts.player(), Some(Player::Offline));
+    assert!(accounts.offline_play && accounts.provider_chosen);
+    accounts.save_to(&file).unwrap();
+    let kept = Accounts::load_from(&file);
+    assert_eq!(kept.player(), Some(Player::Offline));
+    let mut kept = kept;
+    kept.play_as(Player::Microsoft(UUID.into())).unwrap();
+    assert_eq!(kept.player(), Some(Player::Microsoft(UUID.into())));
+    assert!(!kept.offline_play);
+    kept.save_to(&file).unwrap();
+    assert!(!std::fs::read_to_string(&file)
+        .unwrap()
+        .contains("offline_play"));
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn the_games_made_up_name_comes_from_its_file() {
+    let dir = std::env::temp_dir().join(format!("horizon-offline-name-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    std::fs::write(dir.join("horizon-player.txt"), "name:Player00042\n").unwrap();
+    assert_eq!(offline_game_name(&dir), Some("Player00042".to_string()));
+    std::fs::write(dir.join("horizon-player.txt"), "Player\n").unwrap();
+    assert_eq!(offline_game_name(&dir), None);
     let _ = std::fs::remove_dir_all(&dir);
 }

@@ -129,6 +129,15 @@ syn = "2"
 # NoopTextSystem shapes deterministically (glass_server_dialog.rs's foot tests).
 gpui = { package = "gpui-fast", version = "0.1.13", features = ["test-support"] }
 
+[features]
+default = ["no-self-update"]
+# Fork builds never replace their own executable.
+no-self-update = []
+# A fork build that never installs new Horizon versions by itself.
+no-auto-install = []
+# A fork build that may download Minecraft's files without an owning Microsoft account.
+download-without-owner = []
+
 [profile.release]
 strip = true
 

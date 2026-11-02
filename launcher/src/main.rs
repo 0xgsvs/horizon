@@ -107,7 +107,7 @@ use gpui::{
     KeyBinding, KeyDownEvent, Menu, MenuItem, MouseDownEvent, PathPromptOptions, Pixels, Point,
     SharedString, Stateful, Subscription, Window, WindowBounds, WindowOptions,
 };
-use horizon_launcher::account::{self, Accounts, SignIn, SignInState};
+use horizon_launcher::account::{self, Accounts, ElySignIn, ElySignInState, SignIn, SignInState};
 use horizon_launcher::backend::{self, Job, Msg, Release, Running, Settings, Updates};
 use horizon_launcher::build_import;
 use horizon_launcher::i18n::{self, tr, trf};
@@ -459,6 +459,22 @@ struct Launcher {
     owner: Option<bool>,
     /// Play was refused (or Home's Sign in pressed): the owner gate's screen is open.
     owner_screen_open: bool,
+    /// The Ely.by sign-in sheet is open.
+    ely_screen_open: bool,
+    /// The ways to play (Microsoft, Ely.by, offline) were opened again from Settings or the
+    /// account card, after the first start's answer.
+    provider_open: bool,
+    ely_login: line_edit::LineEdit,
+    ely_password: line_edit::LineEdit,
+    ely_code: line_edit::LineEdit,
+    ely_login_focused: bool,
+    ely_password_focused: bool,
+    ely_code_focused: bool,
+    ely_login_focus: FocusHandle,
+    ely_password_focus: FocusHandle,
+    ely_code_focus: FocusHandle,
+    ely_sign_in: Option<ElySignIn>,
+    ely_state: Option<ElySignInState>,
     /// The game is waiting for its session (a token renewal), or a Java instance for its files
     /// and Java (`start_java`), before it starts.
     starting_client: Option<String>,

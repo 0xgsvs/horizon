@@ -1009,7 +1009,11 @@ impl Launcher {
         let strip = self.nav_strip.render(tabs, &t, performance, window);
 
         let (name, how) = self.who_plays();
-        let face = self.accounts.selected().map(|a| a.uuid.clone());
+        let face: Option<String> = self
+            .accounts
+            .player()
+            .map(|p| p.uuid().to_string())
+            .filter(|uuid| !uuid.is_empty());
         let open = self.account_menu;
         // Signed out, the chip is only the face: the Sign in with Microsoft button beside it
         // says it once, and the page tabs keep their room.
@@ -1075,36 +1079,7 @@ impl Launcher {
             .child(keyboard(chip, &t))
             .children(self.glass_account_menu(cx));
 
-        // Signing in with Microsoft, while nobody is: the mockup's button.
-        let sign_in = self.accounts.selected().is_none().then(|| {
-            keyboard(
-                div()
-                    .id("topbar-sign-in")
-                    .relative()
-                    .flex()
-                    .items_center()
-                    .gap(px(10.))
-                    .h(px(44.))
-                    .px(px(if tight { 14. } else { 16. }))
-                    .rounded(px(radius::ROW))
-                    .bg(white(fill::BUTTON))
-                    .hover(|s| s.bg(white(fill::BUTTON_HOVER)))
-                    .cursor_pointer()
-                    .child(microsoft::logo(16.))
-                    .when(!tight, |d| {
-                        d.child(
-                            ui::text(14., FontWeight::MEDIUM, ink::FULL)
-                                .child(tr("Sign in with Microsoft")),
-                        )
-                    })
-                    .when(tight, |d| d.tooltip(ui::tip(tr("Sign in with Microsoft"))))
-                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
-                        this.start_sign_in();
-                        cx.notify();
-                    })),
-                &t,
-            )
-        });
+        // Signing in, Ely.by and offline live under the chip's menu (`glass_account_menu`).
         // Search: the palette (⌘K or Ctrl+K anywhere), as a field-shaped button.
         let sid = SharedString::from("topbar-search");
         let key: &str = if cfg!(target_os = "macos") {
@@ -1186,8 +1161,7 @@ impl Launcher {
                     .items_center()
                     .gap(px(8.))
                     .child(search)
-                    .child(account)
-                    .children(sign_in),
+                    .child(account),
             )
     }
 
@@ -1198,7 +1172,7 @@ impl Launcher {
         }
         let t = self.theme;
         let soft = self.look.accent_soft;
-        let now = self.accounts.selected().map(|a| a.uuid.clone());
+        let now = self.accounts.player();
         let mut menu = ui::popover(250.)
             .id("account-menu")
             .occlude()
@@ -1208,7 +1182,7 @@ impl Launcher {
                 cx.notify();
             }));
         for (i, (who, name, how)) in self.players().into_iter().enumerate() {
-            let chosen = Some(&who) == now.as_ref();
+            let chosen = now.as_ref() == Some(&who);
             let id = SharedString::from(format!("account-pick-{i}"));
             menu = menu.child(keyboard(
                 track_hover(
@@ -1230,7 +1204,7 @@ impl Launcher {
                                 .rounded(px(8.))
                                 .overflow_hidden()
                                 .child(self.profile_heads.draw(
-                                    Some(who.as_str()),
+                                    Some(who.uuid()),
                                     30.,
                                     self.scale,
                                     &t,
@@ -1262,6 +1236,30 @@ impl Launcher {
                 &t,
             ));
         }
+        menu = menu.child(
+            div().mt(px(4.)).child(
+                ui::menu_row(
+                    "account-add",
+                    "user",
+                    if account::client_id().is_some() {
+                        tr("Sign in with Microsoft")
+                    } else {
+                        tr("Ely.by account or play offline")
+                    },
+                    false,
+                    &t,
+                )
+                .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                    this.account_menu = false;
+                    if account::client_id().is_some() {
+                        this.start_sign_in();
+                    } else {
+                        this.open_provider();
+                    }
+                    cx.notify();
+                })),
+            ),
+        );
         menu = menu.child(div().mt(px(4.)).child(
             ui::menu_row("account-manage", "user", tr("Manage accounts"), false, &t).on_click(
                 cx.listener(|this, _: &ClickEvent, _, cx| {

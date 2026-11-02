@@ -290,7 +290,7 @@ impl Launcher {
                     ),
                     &t,
                 ));
-            } else if self.accounts.selected().is_none() && account::client_id().is_some() {
+            } else if self.accounts.player().is_none() && account::client_id().is_some() {
                 rows = rows.child(index_row(
                     5,
                     tr("Playing offline"),

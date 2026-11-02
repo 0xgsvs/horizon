@@ -511,6 +511,28 @@ impl Launcher {
                 changed = true;
             }
         }
+        let ely_state = self.ely_sign_in.as_ref().map(ElySignIn::state);
+        if let Some(state) = ely_state {
+            if self.ely_state.as_ref() != Some(&state) {
+                self.ely_state = Some(state.clone());
+                if let ElySignInState::Done(Ok(_)) = &state {
+                    self.accounts = Accounts::load();
+                    self.ely_screen_open = false;
+                    self.owner_screen_open = false;
+                    self.client_error = None;
+                    self.ely_password.set(String::new());
+                    self.ely_code.set(String::new());
+                    if !self.settings.owner_notice_seen {
+                        self.settings.owner_notice_seen = true;
+                        self.save_settings();
+                    }
+                }
+                if matches!(state, ElySignInState::Done(_) | ElySignInState::TwoFactor) {
+                    self.ely_sign_in = None;
+                }
+                changed = true;
+            }
+        }
         if self
             .checked
             .is_some_and(|at| at.elapsed() > backend::CHECK_EVERY)

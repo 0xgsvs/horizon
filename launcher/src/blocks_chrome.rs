@@ -28,7 +28,7 @@ impl Launcher {
         }
         // A signed-in account shows its face (its skin, else its UUID's default).
         let (name, how) = self.who_plays();
-        let face = self.accounts.selected().map(|a| a.uuid.clone());
+        let face = self.accounts.player().map(|p| p.uuid().to_string());
         let picture = match face {
             Some(uuid) => (self.profile_heads)
                 .draw(Some(&uuid), 28., self.scale, &t)

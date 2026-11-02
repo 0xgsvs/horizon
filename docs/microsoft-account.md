@@ -3,8 +3,9 @@
 Horizon signs players in with their Microsoft account in the launcher and joins online-mode
 (authenticated) servers like vanilla 26.3 does. The launcher plays only with an account that owns
 Minecraft: Java Edition ([the owner gate](#the-owner-gate)), as that account, on LAN and
-offline-mode servers too. There are no offline names. This note is the design, the status of each
-part and what Ludovic has to register.
+offline-mode servers too. Ely.by accounts play without a Microsoft account
+([elyby-account.md](elyby-account.md)); there are no offline names. This note is the design, the
+status of each part and what Ludovic has to register.
 
 ## What Ludovic registers (needs his accounts)
 
@@ -78,7 +79,8 @@ All requests use HTTPS and JSON except the two OAuth calls (form-encoded):
 
 Decided 2026-10-27 (Ludovic, after a modder's suggestion): like other launchers, Horizon's
 launcher starts the game only while an account in it owns Java Edition. Offline play stays
-possible; the launcher just doesn't offer it on its own.
+possible, and the launcher offers it: first start (and Settings' account card) asks how to play,
+with Play offline beside the Microsoft and Ely.by accounts.
 
 - **Play needs an owner.** Every Play (Home, instances and packs, `horizon-launcher play`,
   `modpack play`, the MCP's `play`) asks `account::launch` first. It asks the Minecraft services
@@ -96,13 +98,15 @@ possible; the launcher just doesn't offer it on its own.
   `secret-tool` or Keychain Access. With no network (or a sign-in that can't be renewed) the
   last answer stands: being offline never blocks a player who passed before, and the game starts
   without a session, offline. An answer of "doesn't own" (or no profile) blocks at once.
-- **The account that plays owns the game.** The game plays as the selected account (else the
-  first), which must own the game itself: another account's ownership doesn't let it play
-  (`account::launch_for_game`). The project decided on 2026-11-09 that Horizon plays only with a
-  Microsoft account that owns Minecraft: Java Edition: the offline names, their skins and capes,
-  and 0.2.58's hidden developer option are gone. Files from older launchers still load; the next
-  save drops them (`offline`, `offline_selected`, `looks` and `skins/` in accounts.json's folder,
-  `dev_offline` in settings.json).
+- **The account that plays owns the game.** The game plays as the selected Microsoft account (else
+  the first), which must own the game itself: another account's ownership doesn't let it play
+  (`account::launch_for_game`). An Ely.by account plays without this gate. The project decided on
+  2026-11-09 that Microsoft Play needs an account that owns Minecraft: Java Edition: the offline
+  names, their skins and capes, and 0.2.58's hidden developer option are gone. Files from older
+  launchers still load; the next save drops them (`offline`, `offline_selected`, `looks` and
+  `skins/` in accounts.json's folder, `dev_offline` in settings.json). **Play offline** plays
+  without an account and without this gate: single player and LAN worlds under the name the game
+  makes up (`horizon-player.txt`); online servers need an account, and so do Mojang downloads.
 - **Who isn't affected:** the game binary itself (`horizon-client`, `horizon-ctl launch`, the
   harnesses, CI), the dedicated server and `horizon-server`, the website. There is no bypass flag:
   the launcher's tests use accounts in a memory store (`MemoryStore`, and `HORIZON_NO_KEYCHAIN`

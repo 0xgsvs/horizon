@@ -81,6 +81,12 @@ pub(super) struct Options {
     pub(super) session_file: Option<String>,
     /// `--session-stdin`: the session file's JSON comes on standard input instead.
     pub(super) session_stdin: bool,
+    /// `--elyby-login LOGIN`: sign in with an Ely.by account and keep it.
+    pub(super) elyby_login: Option<String>,
+    /// `--elyby-logout`: invalidate and forget the kept Ely.by account.
+    pub(super) elyby_logout: bool,
+    /// `--offline`: ignore a kept Ely.by account and play under the plain name.
+    pub(super) offline: bool,
 }
 
 impl Options {
@@ -131,17 +137,53 @@ impl Options {
                 .map(|path| horizon_client::auth::AuthSession::load(path.as_ref()))
                 .transpose()
         };
+        let mut signed_in = false;
         match session {
             Ok(Some(session)) => {
                 o.player_name = Some(session.name.clone());
                 horizon_client::auth::set_current(session);
                 // The chat key pair, ready before the first join.
                 horizon_client::auth::prepare_chat_keys(true);
+                signed_in = true;
             }
             Ok(None) => {}
             Err(e) => eprintln!("Horizon: not signed in: {e}"),
         }
         split::launcher::read_now();
+        let elyby_dir = horizon_client::logging::player_dir_override()
+            .map(std::path::Path::to_path_buf)
+            .or_else(|| o.game_dir.clone())
+            .unwrap_or_else(horizon_client::logging::player_dir);
+        let _ = std::fs::create_dir_all(&elyby_dir);
+        if o.elyby_logout {
+            if let Some(account) = horizon_client::elyby::load(&elyby_dir) {
+                account.sign_out();
+            }
+            horizon_client::elyby::forget(&elyby_dir);
+            println!("Horizon: signed out of Ely.by");
+            return Ok(None);
+        }
+        if !signed_in && !o.offline && o.execution_role.is_client() {
+            let account = match o.elyby_login.take() {
+                Some(login) => Some(horizon_client::elyby::cli_sign_in(&login, &elyby_dir)?),
+                None => horizon_client::elyby::stored_for_start(&elyby_dir)
+                    .map_err(|e| {
+                        eprintln!(
+                            "Horizon: Ely.by: {e}; playing offline (--elyby-login signs in again)"
+                        );
+                    })
+                    .ok()
+                    .flatten(),
+            };
+            if let Some(account) = account {
+                o.player_name = Some(account.name.clone());
+                horizon_client::auth::set_current(account.session());
+            }
+        } else if o.elyby_login.is_some() {
+            eprintln!(
+                "Horizon: --elyby-login ignored (another account is signed in, or --offline)"
+            );
+        }
         if let Some(dir) = o.game_dir.take() {
             // These too stay relative to where the game was started.
             o.resources = std::path::absolute(&o.resources)?;
@@ -229,12 +271,15 @@ impl Options {
             quick_play: None,
             session_file: std::env::var("HORIZON_SESSION_FILE").ok(),
             session_stdin: false,
+            elyby_login: None,
+            elyby_logout: false,
+            offline: false,
         };
         while let Some(arg) = args.next() {
             match arg.as_str() {
                 "--help" | "-h" => {
                     println!(
-                        "Horizon — Minecraft Java Edition {} in Rust\n\n  --resources PATH        Prepared resources (horizon-prepare)\n  --render-distance N     Chunks, 2..128 (default 12)\n  --world NAME            World folder under saves/ (default \"New World\")\n  --seed N                World seed for new worlds (default 0)\n  --width N, --height N   Window size (default 1280 x 720)\n  --creative              Creative mode (default survival)\n  --test-terrain          Simple test terrain instead of vanilla generation\n  --frames N              Exit after N frames (testing)\n  --world-frames N        Exit after N frames drawn in the world (testing)\n  --timeout-seconds N     Exit with an error after N seconds (testing; default 120 with --frames, else none)\n  --smoke-report PATH     Write a JSON report on exit\n  --benchmark SCENARIO    Run a benchmark (standard, village, forest, ocean, mountain, travel, ab:SWITCH), write its report to benchmarks/ and quit\n  --profile               With --benchmark: also write a performance capture (reports/*.hzperf in the game home) that embeds the report\n  --benchmark-set S=V     With --benchmark travel: set a graphics switch (gpu-culling, section-cull, section-sides, section-draws) to one of its two values first\n  --control               Accept horizon-ctl commands on a local socket\n  --control-socket PATH   Control socket path (default $XDG_RUNTIME_DIR/horizon-control.sock)\n  --transfers SETTINGS    A dedicated server takes a proxy's hand-over requests (server.toml [transfer], docs/server.md)\n  --server HOST[:PORT]    Join a multiplayer server (offline mode) at start\n  --quickPlaySingleplayer WORLD  Open this world of saves/ at start, only if it exists (vanilla's)\n  --quickPlayMultiplayer HOST[:PORT]  The same as --server (vanilla's name)\n  --name NAME             Player name for multiplayer (default: generated once, kept in horizon-player.txt)\n  --session-file PATH     Signed-in account from the launcher (read once, then deleted)\n  --session-stdin         The same account as JSON on standard input\n  --game-dir DIR          Game folder: saves, options.txt, packs, mods (default: the working directory)\n  --home DIR              Logs and crash reports (default $HORIZON_HOME, else the platform data folder)\n  --player-dir DIR        This player's own files when several play in one game folder: options.txt, logs, horizon-player.txt, servers.dat, screenshots\n  --fullscreen            Open the window fullscreen\n  --launch-api            Print the Launch API version and options as JSON (docs/api/launch.md)\n  --dev-mod PATH          A content mod (.hmod or folder) to develop: always on\n  --pregen                Add Horizon's /pregen command (docs/pregeneration.md)\n\nControls: mouse look, WASD move, Space jump, Left Shift sneak, Left Ctrl sprint,\nleft click break, right click place/use, 1-9/scroll hotbar, E inventory,\nQ drop, F3 debug, Esc pause.",
+                        "Horizon — Minecraft Java Edition {} in Rust\n\n  --resources PATH        Prepared resources (horizon-prepare)\n  --render-distance N     Chunks, 2..128 (default 12)\n  --world NAME            World folder under saves/ (default \"New World\")\n  --seed N                World seed for new worlds (default 0)\n  --width N, --height N   Window size (default 1280 x 720)\n  --creative              Creative mode (default survival)\n  --test-terrain          Simple test terrain instead of vanilla generation\n  --frames N              Exit after N frames (testing)\n  --world-frames N        Exit after N frames drawn in the world (testing)\n  --timeout-seconds N     Exit with an error after N seconds (testing; default 120 with --frames, else none)\n  --smoke-report PATH     Write a JSON report on exit\n  --benchmark SCENARIO    Run a benchmark (standard, village, forest, ocean, mountain, travel, ab:SWITCH), write its report to benchmarks/ and quit\n  --profile               With --benchmark: also write a performance capture (reports/*.hzperf in the game home) that embeds the report\n  --benchmark-set S=V     With --benchmark travel: set a graphics switch (gpu-culling, section-cull, section-sides, section-draws) to one of its two values first\n  --control               Accept horizon-ctl commands on a local socket\n  --control-socket PATH   Control socket path (default $XDG_RUNTIME_DIR/horizon-control.sock)\n  --transfers SETTINGS    A dedicated server takes a proxy's hand-over requests (server.toml [transfer], docs/server.md)\n  --server HOST[:PORT]    Join a multiplayer server (offline mode) at start\n  --quickPlaySingleplayer WORLD  Open this world of saves/ at start, only if it exists (vanilla's)\n  --quickPlayMultiplayer HOST[:PORT]  The same as --server (vanilla's name)\n  --name NAME             Player name for multiplayer (default: generated once, kept in horizon-player.txt)\n  --session-file PATH     Signed-in account from the launcher (read once, then deleted)\n  --session-stdin         The same account as JSON on standard input\n  --elyby-login LOGIN     Sign in with an Ely.by account and keep it in horizon-elyby.json\n  --elyby-logout          Forget the kept Ely.by account\n  --offline               Play under --name / the kept offline name, ignoring Ely.by\n  --game-dir DIR          Game folder: saves, options.txt, packs, mods (default: the working directory)\n  --home DIR              Logs and crash reports (default $HORIZON_HOME, else the platform data folder)\n  --player-dir DIR        This player's own files when several play in one game folder: options.txt, logs, horizon-player.txt, servers.dat, screenshots\n  --fullscreen            Open the window fullscreen\n  --launch-api            Print the Launch API version and options as JSON (docs/api/launch.md)\n  --dev-mod PATH          A content mod (.hmod or folder) to develop: always on\n  --pregen                Add Horizon's /pregen command (docs/pregeneration.md)\n\nControls: mouse look, WASD move, Space jump, Left Shift sneak, Left Ctrl sprint,\nleft click break, right click place/use, 1-9/scroll hotbar, E inventory,\nQ drop, F3 debug, Esc pause.",
                         horizon_core::VANILLA_VERSION
                     );
                     return Ok(None);
@@ -255,6 +300,8 @@ impl Options {
                 "--test-terrain" => o.test_terrain = true,
                 "--no-pause" => o.no_pause = true,
                 "--offscreen" => o.offscreen = true,
+                "--offline" => o.offline = true,
+                "--elyby-logout" => o.elyby_logout = true,
                 "--headless" => {
                     o.headless = true;
                     o.offscreen = true;
@@ -341,6 +388,7 @@ impl Options {
                             "--server" | "--quickPlayMultiplayer" => o.server = Some(value),
                             "--name" => o.player_name = Some(value),
                             "--session-file" => o.session_file = Some(value),
+                            "--elyby-login" => o.elyby_login = Some(value),
                             "--control-socket" => o.control = Some(value.into()),
                             "--transfers" => {
                                 o.transfers =

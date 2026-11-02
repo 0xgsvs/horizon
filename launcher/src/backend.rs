@@ -2113,18 +2113,25 @@ fn download_for_owner(
     fetch: sources::Fetch,
     log: &dyn Fn(String),
 ) -> Result<(), String> {
-    let mut accounts = account::Accounts::load();
-    // Any account that owns the game may download it (`launch`), not only the one that plays.
-    let pass = account::launch(
-        &account::Endpoints::live(),
-        account::client_id().as_deref(),
-        account::store(),
-        &mut accounts,
-    );
-    if let Err(e) = accounts.save_renewed() {
-        log(format!("Horizon: the accounts are not saved: {e}"));
+    // The fork's switch skips the Microsoft check entirely, as an offline launcher does.
+    #[cfg(feature = "download-without-owner")]
+    return download_for(pins, dir, Err(account::NoOwner::default()), false, fetch, log);
+
+    #[cfg(not(feature = "download-without-owner"))]
+    {
+        let mut accounts = account::Accounts::load();
+        // Any account that owns the game may download it (`launch`), not only the one that plays.
+        let pass = account::launch(
+            &account::Endpoints::live(),
+            account::client_id().as_deref(),
+            account::store(),
+            &mut accounts,
+        );
+        if let Err(e) = accounts.save_renewed() {
+            log(format!("Horizon: the accounts are not saved: {e}"));
+        }
+        download_for(pins, dir, pass, !accounts.accounts.is_empty(), fetch, log)
     }
-    download_for(pins, dir, pass, !accounts.accounts.is_empty(), fetch, log)
 }
 
 /// Downloads Minecraft `id` (any version on Mojang's list, its version file's sha1 from it) into
@@ -2256,6 +2263,14 @@ fn download_for(
     log: &dyn Fn(String),
 ) -> Result<(), String> {
     let v = &pins.version;
+    #[cfg(feature = "download-without-owner")]
+    let _ = signed_in;
+    let os = match sources::Os::current() {
+        sources::Os::Linux => "linux",
+        sources::Os::MacOs => "osx",
+        sources::Os::Windows => "windows",
+    };
+    let download = || mojang::download(pins, dir, os, 8, fetch, &mojang::CANCEL, log);
     match pass {
         Ok(account::Launch {
             owner: Some((owner, _)),
@@ -2265,25 +2280,31 @@ fn download_for(
             log(format!(
                 "{name} owns Minecraft: downloading {v} from Mojang"
             ));
-            let os = match sources::Os::current() {
-                sources::Os::Linux => "linux",
-                sources::Os::MacOs => "osx",
-                sources::Os::Windows => "windows",
-            };
-            mojang::download(pins, dir, os, 8, fetch, &mojang::CANCEL, log).map_err(|e| {
+            download().map_err(|e| {
                 format!("\n  • Horizon tried to download {v} from Mojang for {name}, but: {e}")
             })
         }
+        // The fork build may fetch the files without an ownership check.
+        #[cfg(feature = "download-without-owner")]
+        Ok(_) | Err(_) => {
+            log(format!("Downloading {v} from Mojang"));
+            download().map_err(|e| {
+                format!("\n  • Horizon tried to download {v} from Mojang, but: {e}")
+            })
+        }
         // An owner by its last answer, who can't be asked now.
+        #[cfg(not(feature = "download-without-owner"))]
         Ok(pass) => Err(format!(
             "\n  • Downloading {v} from Mojang needs your Microsoft account, which could not be \
              checked: {}",
             pass.offline.unwrap_or_default()
         )),
+        #[cfg(not(feature = "download-without-owner"))]
         Err(_) if signed_in => Err(
             "\n  • No signed-in account owns Minecraft: Java Edition, so Horizon can't download it."
                 .into(),
         ),
+        #[cfg(not(feature = "download-without-owner"))]
         Err(_) => Err(format!(
             "\n  • Or sign in with the Microsoft account that owns Minecraft: Horizon then \
              downloads {v} from Mojang itself."
@@ -3545,9 +3566,13 @@ fn launcher_asset_running_from(appimage: bool) -> Option<&'static str> {
     }
 }
 
-/// Development builds and `HORIZON_LAUNCHER_NO_SELF_UPDATE` never replace themselves.
+/// Development builds, builds made with `HORIZON_LAUNCHER_NO_SELF_UPDATE`, and runs with it set
+/// never replace themselves.
 pub fn self_update_allowed() -> bool {
-    !cfg!(debug_assertions) && std::env::var_os("HORIZON_LAUNCHER_NO_SELF_UPDATE").is_none()
+    !cfg!(feature = "no-self-update")
+        && !cfg!(debug_assertions)
+        && option_env!("HORIZON_LAUNCHER_NO_SELF_UPDATE").is_none()
+        && std::env::var_os("HORIZON_LAUNCHER_NO_SELF_UPDATE").is_none()
 }
 
 /// The version in `horizon-launcher --version`'s output (`horizon-launcher 0.1.5`).
@@ -4571,7 +4596,7 @@ impl Settings {
     }
     /// Whether new Horizon versions are installed automatically.
     pub fn auto_install(&self) -> bool {
-        self.install_new_versions.unwrap_or(true)
+        !cfg!(feature = "no-auto-install") && self.install_new_versions.unwrap_or(true)
     }
     /// Whether old versions are deleted after an install.
     pub fn auto_prune(&self) -> bool {
@@ -4778,6 +4803,7 @@ mod tests {
     /// The launcher downloads Mojang's game files (client jar, libraries, assets) only for an
     /// account the services said owns the game: never without one, and never past the gate by
     /// the developer option (`Settings::dev_offline`), whose pass has no owner.
+    #[cfg(not(feature = "download-without-owner"))]
     #[test]
     fn mojang_downloads_only_for_an_owner() {
         let dir = std::env::temp_dir().join(format!("horizon-owner-only-{}", std::process::id()));
@@ -4873,8 +4899,8 @@ mod tests {
         assert!(body("download_for").contains("mojang::download("));
         assert!(body("download_for_owner").contains("account::launch("));
         assert!(!body("download_for_owner").contains("launch_for_game("));
-        // `download_for` is defined once and called once, by `download_for_owner`.
-        assert_eq!(backend.matches("download_for(").count(), 2);
+        // `download_for` is defined once: the owner path and the fork's no-owner switch call it.
+        assert_eq!(backend.matches("download_for(").count(), 3);
         assert!(body("download_for_owner").contains("download_for("));
         // Refilling an incomplete store asks the same gate and names no host or download itself.
         assert!(body("refill_own_store").contains("download_for_owner("));
@@ -4911,6 +4937,29 @@ pub fn {f}("
                 );
             }
         }
+    }
+
+    #[cfg(feature = "download-without-owner")]
+    #[test]
+    fn the_fork_downloads_without_an_owner() {
+        let dir =
+            std::env::temp_dir().join(format!("horizon-fork-download-{}", std::process::id()));
+        let _ = fs::remove_dir_all(&dir);
+        let pins = sources::Pins::read(&serde_json::json!({ "minecraft": {
+            "version": "26.3",
+            "client_sha1": "00",
+            "manifest_sha1": "00",
+        }}))
+        .unwrap();
+        let asked = std::sync::Mutex::new(Vec::<String>::new());
+        let fetch = |url: &str| -> Result<Vec<u8>, String> {
+            asked.lock().unwrap().push(url.to_string());
+            Err("no network in tests".into())
+        };
+        let log = |_: String| {};
+        assert!(download_for(&pins, &dir, Err(account::NoOwner::default()), false, &fetch, &log).is_err());
+        assert!(!asked.lock().unwrap().is_empty());
+        let _ = fs::remove_dir_all(&dir);
     }
 
     /// A preparation that reuses the imported game files still reads the assets from the
@@ -6266,6 +6315,7 @@ pub fn {f}("
         ));
     }
 
+    #[cfg(not(feature = "no-auto-install"))]
     #[test]
     fn new_versions_install_automatically_unless_turned_off() {
         // No settings file, an old one that never mentioned it, and 0.1.1's default `false`.
@@ -6282,6 +6332,16 @@ pub fn {f}("
             ..Settings::default()
         };
         assert!(!Settings::parse(&serde_json::to_string(&off).unwrap()).auto_install());
+    }
+
+    #[cfg(feature = "no-auto-install")]
+    #[test]
+    fn fork_build_never_installs_new_versions() {
+        assert!(!Settings::parse(r#"{"install_new_versions": true}"#).auto_install());
+    }
+
+    #[test]
+    fn the_selection_rule_is_unchanged() {
         // The selection rule is unchanged: the new version is selected only from the newest.
         let installed = ["v2026.10.12".to_string(), "v2026.10.1".to_string()];
         assert!(select_after_update(Some("v2026.10.12"), &installed));

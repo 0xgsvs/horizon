@@ -2016,7 +2016,7 @@ fn account_command(action: AccountCmd, as_json: bool) -> Result<(), String> {
         }
         AccountCmd::Select { who } => {
             let a = find(&accounts, &who)?;
-            accounts.play_as(&a.uuid)?;
+            accounts.play_as(account::Player::Microsoft(a.uuid.clone()))?;
             accounts.save()?;
             println!("The game plays as {}.", a.name);
         }

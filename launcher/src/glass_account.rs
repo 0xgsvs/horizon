@@ -6,6 +6,7 @@
 
 use super::*;
 use crate::glass_ui::{self as ui, white, Tone};
+use account::Player;
 use horizon_theme::glass::{ink, radius};
 
 impl Launcher {
@@ -33,11 +34,26 @@ impl Launcher {
     /// The player now.
     fn glass_who_plays(&self) -> Div {
         let t = self.theme;
-        let (uuid, name, status) = match self.accounts.selected() {
-            Some(a) => (
-                Some(a.uuid.clone()),
-                a.name.clone(),
+        let (uuid, name, status) = match self.accounts.player() {
+            Some(Player::Microsoft(uuid)) => (
+                Some(uuid),
+                self.accounts
+                    .selected()
+                    .map_or_else(String::new, |a| a.name.clone()),
                 (Tone::Live, tr("Microsoft account · online servers too")),
+            ),
+            Some(Player::ElyBy(uuid)) => (
+                Some(uuid),
+                self.accounts
+                    .elyby_selected()
+                    .map_or_else(String::new, |a| a.name.clone()),
+                (Tone::Live, tr("Ely.by")),
+            ),
+            Some(Player::Offline) => (
+                None,
+                account::offline_game_name(&backend::game_home())
+                    .unwrap_or_else(|| tr("Offline").to_string()),
+                (Tone::Off, tr("Offline · single player and LAN worlds")),
             ),
             None => (
                 None,
@@ -182,6 +198,20 @@ impl Launcher {
                     .child(note),
             )
             .children(button)
+            .child(
+                div().flex().justify_center().mt(px(12.)).child(
+                    ui::quiet(
+                        "glass-other-providers",
+                        tr("Ely.by account or play offline"),
+                        36.,
+                        &t,
+                    )
+                    .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                        this.open_provider();
+                        cx.notify();
+                    })),
+                ),
+            )
             .when(configured, |d| {
                 d.child(
                     ui::text(12., FontWeight::NORMAL, 0.45)

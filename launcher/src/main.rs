@@ -85,7 +85,7 @@ use gpui::{
     KeyBinding, KeyDownEvent, Menu, MenuItem, MouseDownEvent, PathPromptOptions, Pixels, Point,
     SharedString, Stateful, Subscription, Window, WindowBounds, WindowOptions,
 };
-use horizon_launcher::account::{self, Accounts, SignIn, SignInState};
+use horizon_launcher::account::{self, Accounts, ElySignIn, ElySignInState, SignIn, SignInState};
 use horizon_launcher::backend::{self, Job, Msg, Release, Running, Settings, Updates};
 use horizon_launcher::build_import;
 use horizon_launcher::i18n::{self, tr, trf};
@@ -379,6 +379,22 @@ struct Launcher {
     owner: Option<bool>,
     /// Play was refused (or Home's Sign in pressed): the owner gate's screen is open.
     owner_screen_open: bool,
+    /// The Ely.by sign-in sheet is open.
+    ely_screen_open: bool,
+    /// The ways to play (Microsoft, Ely.by, offline) were opened again from Settings or the
+    /// account card, after the first start's answer.
+    provider_open: bool,
+    ely_login: line_edit::LineEdit,
+    ely_password: line_edit::LineEdit,
+    ely_code: line_edit::LineEdit,
+    ely_login_focused: bool,
+    ely_password_focused: bool,
+    ely_code_focused: bool,
+    ely_login_focus: FocusHandle,
+    ely_password_focus: FocusHandle,
+    ely_code_focus: FocusHandle,
+    ely_sign_in: Option<ElySignIn>,
+    ely_state: Option<ElySignInState>,
     /// The game is waiting for its session (a token renewal), or a Java instance for its files
     /// and Java (`start_java`), before it starts.
     starting_client: Option<String>,
@@ -687,6 +703,19 @@ impl Launcher {
             keychain: None,
             owner: None,
             owner_screen_open: false,
+            ely_screen_open: false,
+            provider_open: false,
+            ely_login: line_edit::LineEdit::new(String::new(), 128, 30),
+            ely_password: line_edit::LineEdit::new(String::new(), 256, 30),
+            ely_code: line_edit::LineEdit::new(String::new(), 16, 12),
+            ely_login_focused: false,
+            ely_password_focused: false,
+            ely_code_focused: false,
+            ely_login_focus: cx.focus_handle(),
+            ely_password_focus: cx.focus_handle(),
+            ely_code_focus: cx.focus_handle(),
+            ely_sign_in: None,
+            ely_state: None,
             starting_client: None,
             play_when_prepared: None,
             friend_code: line_edit::LineEdit::new(String::new(), 256, 32),
@@ -1596,6 +1625,28 @@ impl Launcher {
                         self.settings.owner_notice_seen = true;
                         self.save_settings();
                     }
+                }
+                changed = true;
+            }
+        }
+        let ely_state = self.ely_sign_in.as_ref().map(ElySignIn::state);
+        if let Some(state) = ely_state {
+            if self.ely_state.as_ref() != Some(&state) {
+                self.ely_state = Some(state.clone());
+                if let ElySignInState::Done(Ok(_)) = &state {
+                    self.accounts = Accounts::load();
+                    self.ely_screen_open = false;
+                    self.owner_screen_open = false;
+                    self.client_error = None;
+                    self.ely_password.set(String::new());
+                    self.ely_code.set(String::new());
+                    if !self.settings.owner_notice_seen {
+                        self.settings.owner_notice_seen = true;
+                        let _ = self.settings.save();
+                    }
+                }
+                if matches!(state, ElySignInState::Done(_) | ElySignInState::TwoFactor) {
+                    self.ely_sign_in = None;
                 }
                 changed = true;
             }
@@ -2837,7 +2888,7 @@ impl Launcher {
         }
         // A signed-in account shows its face (its skin, else its UUID's default).
         let (name, how) = self.who_plays();
-        let face = self.accounts.selected().map(|a| a.uuid.clone());
+        let face = self.accounts.player().map(|p| p.uuid().to_string());
         let picture = match face {
             Some(uuid) => (self.profile_heads)
                 .draw(Some(&uuid), 28., self.scale, &t)
@@ -3560,7 +3611,7 @@ impl Launcher {
                     ),
                     &t,
                 ));
-            } else if self.accounts.selected().is_none() && account::client_id().is_some() {
+            } else if self.accounts.player().is_none() && account::client_id().is_some() {
                 rows = rows.child(index_row(
                     5,
                     tr("Playing offline"),
@@ -3980,6 +4031,7 @@ impl Launcher {
             );
         }
         let (accounts, n) = self.account_rows(cx);
+        let (elyby, n) = self.elyby_rows(n, cx);
         let group = |label: &'static str, icon: &'static str| {
             section_title(label, icon, &t).mt(px(20.)).mb(px(12.))
         };
@@ -3998,6 +4050,7 @@ impl Launcher {
                     .flex_col()
                     .child(group("Account", "user").mt_0())
                     .child(accounts)
+                    .child(elyby)
                     .child(group("Updates", "reload"))
                     .child(index_row(n + 1, "Horizon", Some(plain(&horizon)), horizon_action, &t))
                     .child(index_row(
@@ -4407,6 +4460,25 @@ impl Launcher {
             action,
             &t,
         ));
+        n += 1;
+        let offline_detail = div()
+            .child(tr(
+                "Offline plays single player and LAN worlds under the game's own name (online servers need an account).",
+            ))
+            .into_any_element();
+        let offline_action = button("play-offline-row", "Play offline", Kind::Ghost, &t)
+            .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {
+                this.play_as(&account::Player::Offline);
+                cx.notify();
+            }))
+            .into_any_element();
+        rows = rows.child(index_row(
+            n,
+            tr("Play offline"),
+            Some(offline_detail),
+            Some(offline_action),
+            &t,
+        ));
         (rows, n)
     }
 
@@ -4425,11 +4497,7 @@ impl Launcher {
                 actions = actions.child(
                     button(format!("offline-{i}"), "Play offline", Kind::Ghost, &t).on_click(
                         cx.listener(|this, _: &ClickEvent, _, cx| {
-                            let mut accounts = Accounts::load();
-                            accounts.selected = None;
-                            if accounts.save().is_ok() {
-                                this.accounts = accounts;
-                            }
+                            this.play_as(&account::Player::Offline);
                             cx.notify();
                         }),
                     ),
@@ -4439,7 +4507,8 @@ impl Launcher {
                 actions = actions.child(
                     button(format!("select-{i}"), "Play as", Kind::Secondary, &t).on_click(
                         cx.listener(move |this, _: &ClickEvent, _, cx| {
-                            this.play_as(&uuid);
+                            let who = account::Player::Microsoft(uuid.clone());
+                            this.play_as(&who);
                             cx.notify();
                         }),
                     ),
@@ -5498,6 +5567,12 @@ impl Render for Launcher {
         }
         if self.asking_consent() {
             root = root.child(self.consent_screen(cx));
+        }
+        if self.asking_provider() {
+            root = root.child(self.provider_screen(cx));
+        }
+        if self.ely_screen_open || owner_page::page_preview("elyby") {
+            root = root.child(self.ely_screen(cx));
         }
         if self.asking_owner() {
             root = root.child(self.owner_screen(cx));

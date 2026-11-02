@@ -110,5 +110,14 @@ winresource = "0.1"
 # Tokenize source strings for the translation completeness test, including multiline calls.
 syn = "2"
 
+[features]
+default = ["no-self-update"]
+# Fork builds never replace their own executable.
+no-self-update = []
+# A fork build that never installs new Horizon versions by itself.
+no-auto-install = []
+# A fork build that may download Minecraft's files without an owning Microsoft account.
+download-without-owner = []
+
 [profile.release]
 strip = true

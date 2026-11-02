@@ -178,8 +178,10 @@ The opening, then Play ([clip](docs/opening.webm)):
 - **Language**: English, French, Russian, German, Simplified Chinese, Spanish, Ukrainian and Polish.
   The window follows the system's language unless the player picks one in Settings > Launcher
   (each named in itself); a string a table lacks shows in English. The tables are
-  `launcher/lang/<code>.json`, English text to its translation, Horizon's own; a test fails when
-  the code asks `tr("…")` for a string a table lacks, or a table keeps one the code dropped.
+  `launcher/lang/<code>.json`, English text to its translation, Horizon's own. **This fork adds
+  English strings without translating them**: a table need not carry every `tr("…")` the code
+  asks for, and none is edited for a new screen. A test still fails when a table keeps a string
+  the code dropped, or a translation drops a `{placeholder}`.
   `horizon-launcher settings language system|en|fr|ru|de|zh|es|uk|pl`.
 - **Console**: Home's Console shows the game's output of this run as it comes: a search (every
   word, any case), Follow to keep the newest line in view, Copy, and Open logs folder. Warnings
@@ -474,14 +476,18 @@ The window, the command line and the MCP server all call the same core, `src/bac
 
 ## Microsoft accounts
 
-The launcher starts the game only while a Microsoft account that owns Minecraft: Java Edition is
-signed in, as other launchers do: without one, Play (Home, instances, `horizon-launcher play`, the
-MCP's `play`) says "Sign in with a Microsoft account that owns Minecraft: Java Edition to play"
-and starts nothing. Settings → Accounts signs in: the launcher shows a code, you enter it at
-microsoft.com/link, and the launcher checks that the account owns the game. It asks again at every
-Play, with the token renewal; with no network the last answer stands, and a "doesn't own" blocks
-at once. The account that plays must own the game itself, and it plays online-mode servers under
-your own name and skin, LAN and offline-mode servers too. The game binary started directly (`horizon-client`,
+The launcher starts the game with a Microsoft account that owns Minecraft: Java Edition, as other
+launchers do, or with an Ely.by account. It can also play offline: first start, the top bar's account menu and Settings' account card
+("Ely.by account or play offline") offer the three ways, and Play offline starts
+single player and LAN worlds under the name the game makes up, with no account at all; online
+servers and Mojang downloads need one. Without Microsoft sign-in configured, Play says "Sign in
+with a Microsoft account that owns Minecraft: Java Edition to play" and starts nothing (offline
+and Ely.by still play). Settings → Accounts signs in: the launcher
+shows a code, you enter it at microsoft.com/link, and the launcher checks that the account owns the
+game. It asks again at every Microsoft Play, with the token renewal; with no network the last answer
+stands, and a "doesn't own" blocks at once. The Microsoft account that plays must own the game
+itself, and it plays online-mode servers under your own name and skin, LAN and offline-mode servers
+too. The game binary started directly (`horizon-client`,
 `horizon-ctl launch`), the harnesses and the servers don't go through this check. Tokens live in the system keychain (Keychain,
 Credential Manager, or the Secret Service on Linux), never in a log or the command line;
 `accounts.json` in the data folder keeps only names and UUIDs. On Linux without a keychain they go
@@ -490,6 +496,11 @@ answers; on macOS and Windows without one you stay signed in until the launcher 
 Tailscale access token never goes to that file: without a keychain it lasts until the launcher
 closes. When the game starts, it gets the session in a private file it
 deletes as soon as it has read it. Sign out removes the tokens.
+
+Ely.by accounts need no Microsoft account: the first-run chooser (and Settings → Accounts) signs in
+with an Ely.by login and password, keeps the token in the keychain, and gives the game a session
+with `user_type: "elyby"`. Online servers accept it when they accept Ely.by. How it works:
+[docs/elyby-account.md](../docs/elyby-account.md).
 
 Sign-in needs Horizon's own Azure app registration: its client ID is built in from
 `HORIZON_MSA_CLIENT_ID` (and `HORIZON_MSA_CLIENT_ID` at run time overrides it; empty = not

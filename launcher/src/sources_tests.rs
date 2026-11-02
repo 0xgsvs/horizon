@@ -176,6 +176,19 @@ fn an_official_folder_with_an_unknown_version_file_gets_the_pinned_one() {
 }
 
 #[test]
+fn pineconemc_is_read_from_its_elyprismlauncher_folder() {
+    let s = Scratch::new("pinecone");
+    let jar = "libraries/com/mojang/minecraft/26.3/minecraft-26.3-client.jar";
+    let dir = s.launcher("ElyPrismLauncher", "", jar);
+    let linked = s.0.join("linked");
+    assert_eq!(
+        resolve_with(&dir, &[], &linked, &Mojang::new(MANIFEST)).unwrap(),
+        linked
+    );
+    assert_linked(&linked, &dir, jar);
+}
+
+#[test]
 fn prism_launcher_and_multimc_are_read_through_their_metadata() {
     let s = Scratch::new("prism");
     let jar = "libraries/com/mojang/minecraft/26.3/minecraft-26.3-client.jar";
@@ -407,14 +420,26 @@ fn the_not_found_message_names_the_launcher_that_was_chosen() {
         error.contains("Launch the 26.3 instance once in Prism Launcher"),
         "{error}"
     );
-    assert!(!error.contains("or in Prism Launcher, MultiMC"), "{error}");
+    assert!(
+        !error.contains("or in Prism Launcher, PineconeMC"),
+        "{error}"
+    );
+    let pine = s.0.join("ElyPrismLauncher");
+    let chosen = pine.join("instances/26.3/minecraft");
+    fs::create_dir_all(&chosen).unwrap();
+    let error =
+        resolve_with(&chosen, &[], &s.0.join("linked"), &Mojang::new(MANIFEST)).unwrap_err();
+    assert!(
+        error.contains("Launch the 26.3 instance once in PineconeMC"),
+        "{error}"
+    );
     // An unknown folder keeps the advice that names every launcher.
     let other = s.0.join("elsewhere");
     fs::create_dir_all(&other).unwrap();
     let error = resolve_with(&other, &[], &s.0.join("linked"), &Mojang::new(MANIFEST)).unwrap_err();
     assert!(
         error.contains(
-            "Prism Launcher, MultiMC, the Modrinth App, ATLauncher, GDLauncher or Dawn Client"
+            "Prism Launcher, PineconeMC, MultiMC, the Modrinth App, ATLauncher, GDLauncher or Dawn Client"
         ),
         "{error}"
     );
@@ -507,7 +532,7 @@ fn nothing_found_lists_every_folder_and_what_it_lacks() {
     );
     assert!(error.starts_with(&expected), "{error}");
     assert!(error.contains(
-        "Prism Launcher, MultiMC, the Modrinth App, ATLauncher, GDLauncher or Dawn Client"
+        "Prism Launcher, PineconeMC, MultiMC, the Modrinth App, ATLauncher, GDLauncher or Dawn Client"
     ));
     // A launcher that isn't installed isn't listed.
     assert!(!error.contains("atlauncher"));
@@ -567,6 +592,7 @@ fn each_system_has_its_launcher_folders() {
         "the official launcher: /home/r/.minecraft",
         "Prism Launcher: /home/r/.local/share/PrismLauncher",
         "Prism Launcher: /home/r/.var/app/org.prismlauncher.PrismLauncher/data/PrismLauncher",
+        "PineconeMC: /home/r/.local/share/ElyPrismLauncher",
         "MultiMC: /home/r/.local/share/multimc",
         "Modrinth App: /home/r/.local/share/ModrinthApp",
         "Modrinth App: /home/r/.var/app/com.modrinth.ModrinthApp/data/ModrinthApp",
@@ -591,6 +617,9 @@ fn each_system_has_its_launcher_folders() {
     assert!(
         got.contains(&"Prism Launcher: /Users/r/Library/Application Support/PrismLauncher".into())
     );
+    assert!(
+        got.contains(&"PineconeMC: /Users/r/Library/Application Support/ElyPrismLauncher".into())
+    );
     assert!(got.contains(&"Dawn Client: /Users/r/Library/Application Support/.dawn".into()));
     let windows = Folders {
         home: "C:/Users/r".into(),
@@ -603,5 +632,6 @@ fn each_system_has_its_launcher_folders() {
         "the official launcher: C:/Users/r/AppData/Roaming/.minecraft"
     );
     assert!(got.contains(&"ATLauncher: C:/Users/r/AppData/Roaming/ATLauncher".into()));
+    assert!(got.contains(&"PineconeMC: C:/Users/r/AppData/Roaming/ElyPrismLauncher".into()));
     assert!(got.contains(&"Dawn Client: C:/Users/r/AppData/Roaming/.dawn".into()));
 }

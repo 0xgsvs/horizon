@@ -1,0 +1,52 @@
+name: windows-launcher
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: windows-latest
+    timeout-minutes: 40
+
+    env:
+      RUSTFLAGS: "-C target-feature=+crt-static"
+      HORIZON_LAUNCHER_NO_SELF_UPDATE: "1"
+      HORIZON_MSA_CLIENT_ID: ${{ vars.HORIZON_MSA_CLIENT_ID }}
+      HORIZON_CURSEFORGE_API_KEY: ${{ secrets.HORIZON_CURSEFORGE_API_KEY }}
+
+    defaults:
+      run:
+        working-directory: launcher
+        shell: pwsh
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: rustfmt, clippy
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: launcher
+          shared-key: launcher-windows
+
+      - name: Check formatting, lint and tests
+        run: |
+          cargo fmt --check
+          cargo clippy --all-targets --locked -- -D warnings
+          cargo clippy --all-targets --locked --features no-auto-install,download-without-owner -- -D warnings
+          cargo test --locked --lib
+          cargo test --locked --lib --features no-auto-install,download-without-owner
+
+      - name: Build launcher
+        run: cargo build --release --locked --features no-auto-install,download-without-owner
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: horizon-launcher-windows-x64
+          path: launcher/target/release/horizon-launcher.exe
+          if-no-files-found: error

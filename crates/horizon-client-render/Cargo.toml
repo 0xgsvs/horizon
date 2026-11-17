@@ -21,6 +21,8 @@ horizon-client-core = { path = "../horizon-client-core" }
 horizon-client-input = { path = "../horizon-client-input" }
 horizon-command = { path = "../horizon-command" }
 horizon-core = { path = "../horizon-core" }
+# Ely.by's authserver client, shared with the launcher (crate `horizon-elyby`).
+horizon-elyby = { path = "../horizon-elyby" }
 horizon-hdr = { path = "../horizon-hdr" }
 horizon-items = { path = "../horizon-items" }
 horizon-mod-package = { path = "../horizon-mod-package" }
@@ -108,6 +110,8 @@ path = "examples/standard_pack_gpu_entities.rs"
 tempfile = "3"
 mod_platform = { package = "horizon-mod-api", path = "../horizon-mod-api", features = ["testing"] }
 horizon-perf = { path = "../horizon-perf" }
+# The test HTTP server the Ely.by authserver tests answer with.
+horizon-elyby = { path = "../horizon-elyby", features = ["mock"] }
 # Tests: a TrueType font to load, and the design system the menus' motion curves match.
 horizon-theme = { path = "../horizon-theme" }
 horizon-items = { path = "../horizon-items", features = ["test-support"] }

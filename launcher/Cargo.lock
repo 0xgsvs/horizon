@@ -3057,6 +3057,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "horizon-elyby"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "serde_json",
+ "ureq",
+]
+
+[[package]]
 name = "horizon-friends"
 version = "0.1.0"
 dependencies = [
@@ -3119,6 +3128,7 @@ dependencies = [
  "gpui-fast-platform",
  "horizon-addresses",
  "horizon-cosmetics",
+ "horizon-elyby",
  "horizon-friends",
  "horizon-launcher-scenery",
  "horizon-mcp",
@@ -3328,6 +3338,7 @@ version = "0.1.0"
 dependencies = [
  "horizon-bench",
  "horizon-core",
+ "horizon-elyby",
  "horizon-guest-stack",
  "horizon-hooks",
  "horizon-java-properties",

@@ -6,9 +6,10 @@ sign in with an [Ely.by](https://ely.by) account through its
 Yggdrasil-compatible authserver. The game binary can also play under a plain
 offline name.
 
-Code: `crates/horizon-client-render/src/elyby.rs` (the authserver client and the
-kept account), `auth.rs` (`Provider`, the session join, the server's check), and
-`crates/horizon-client/src/game/launch_options.rs` (`Options::read`).
+Code: `crates/horizon-elyby` (the authserver client, shared by the game and the launcher; engine code,
+so the address comes from `crates/horizon-addresses`), `crates/horizon-client-render/src/elyby.rs`
+(the kept account), `auth.rs` (`Provider`, the session join, the server's check), and
+`crates/horizon-client/src/game/runtime/launch_options.rs` (`Options::read`).
 
 ## The launcher
 

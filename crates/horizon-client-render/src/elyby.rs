@@ -5,56 +5,16 @@
 //! joins servers that accept Ely.by the way vanilla joins with a Microsoft
 //! session: `session/join` with the access token and the server hash.
 //!
-//! Unlike the launcher's Microsoft tokens (OS keychain), these live in a file:
-//! the game binary has no keychain dependency, and an Ely.by token only grants
-//! what the password would for server joins.
+//! The authserver client is `horizon_elyby`, shared with the launcher. This module keeps the
+//! account in a file: the game binary has no keychain dependency, and an Ely.by token only
+//! grants what the password would for server joins.
 use crate::auth::{AuthSession, Provider, parse_uuid};
 use std::{fmt, io::Write, path::Path, time::Duration};
 
-pub const DEFAULT_BASE: &str = "https://authserver.ely.by";
+pub use horizon_elyby::{Error, base_url, set_built_in};
+
 /// The kept account, in the folder `horizon-player.txt` lives in.
 pub const FILE: &str = "horizon-elyby.json";
-
-/// The authserver: `HORIZON_ELYBY_URL` overrides it (a mock in the harness).
-pub fn base_url() -> String {
-    normalize_base(std::env::var("HORIZON_ELYBY_URL").ok().as_deref())
-}
-
-fn normalize_base(text: Option<&str>) -> String {
-    text.map(|t| t.trim().trim_end_matches('/'))
-        .filter(|t| !t.is_empty())
-        .unwrap_or(DEFAULT_BASE)
-        .to_owned()
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum Error {
-    /// The account has two-factor authentication: ask for the code and call
-    /// again with `Some(code)`.
-    TwoFactorRequired,
-    /// Wrong login, password or code.
-    InvalidCredentials,
-    /// The kept token was refused and can't be renewed: sign in again.
-    SessionExpired,
-    /// No answer, or a 5xx.
-    Unavailable,
-    /// Anything else, with the service's message.
-    Other(String),
-}
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match self {
-            Self::TwoFactorRequired => {
-                f.write_str("This Ely.by account uses two-factor authentication")
-            }
-            Self::InvalidCredentials => f.write_str("Wrong Ely.by login or password"),
-            Self::SessionExpired => f.write_str("The Ely.by session expired: sign in again"),
-            Self::Unavailable => f.write_str("Ely.by is not reachable right now"),
-            Self::Other(message) => f.write_str(message),
-        }
-    }
-}
-impl std::error::Error for Error {}
 
 /// A signed-in Ely.by account with the tokens that keep it signed in.
 #[derive(Clone)]
@@ -82,30 +42,13 @@ impl Account {
         session
     }
 
-    /// `authenticate` and `refresh` answer `accessToken`, `clientToken` and
-    /// `selectedProfile {id, name}`.
-    fn from_grant(body: &str) -> Result<Self, Error> {
-        let bad = || Error::Other("Ely.by sent an answer the game can't read".into());
-        let v: serde_json::Value = serde_json::from_str(body).map_err(|_| bad())?;
-        let profile = v.get("selectedProfile").ok_or_else(|| {
-            Error::Other("This Ely.by account has no profile (choose a username on ely.by)".into())
-        })?;
-        let text = |v: &serde_json::Value, key: &str| {
-            v.get(key).and_then(|s| s.as_str()).map(str::to_owned)
-        };
-        let name = text(profile, "name").ok_or_else(bad)?;
-        if name.is_empty() || name.chars().count() > 16 {
-            return Err(Error::Other(format!(
-                "The Ely.by username {name:?} is not a valid player name"
-            )));
-        }
+    fn from_grant(grant: horizon_elyby::Grant) -> Result<Self, Error> {
         Ok(Self {
-            name,
-            uuid: text(profile, "id")
-                .and_then(|id| parse_uuid(&id))
-                .ok_or_else(bad)?,
-            access_token: text(&v, "accessToken").ok_or_else(bad)?,
-            client_token: text(&v, "clientToken").ok_or_else(bad)?,
+            name: grant.name,
+            uuid: parse_uuid(&grant.uuid)
+                .ok_or_else(|| Error::Other("Ely.by sent an account without a valid id".into()))?,
+            access_token: grant.access_token,
+            client_token: grant.client_token,
         })
     }
 
@@ -140,62 +83,19 @@ impl Account {
         })
     }
 
-    /// Ok(true) the token works, Ok(false) it was refused, Err(Unavailable) no answer (so
-    /// nothing is known).
-    fn validate_at(&self, base: &str) -> Result<bool, Error> {
-        match agent()
-            .post(&format!("{base}/auth/validate"))
-            .set("Content-Type", "application/json; charset=utf-8")
-            .send_string(&serde_json::json!({ "accessToken": self.access_token }).to_string())
-        {
-            Ok(_) => Ok(true),
-            Err(ureq::Error::Status(status, _)) if status < 500 => Ok(false),
-            Err(_) => Err(Error::Unavailable),
-        }
-    }
-
-    /// A new access token for the same client token.
-    fn refresh_at(&self, base: &str) -> Result<Self, Error> {
-        let body = post_at(
-            base,
-            "/auth/refresh",
-            serde_json::json!({
-                "accessToken": self.access_token,
-                "clientToken": self.client_token,
-                "requestUser": false,
-            }),
-        )
-        .map_err(|e| match e {
-            Error::InvalidCredentials | Error::TwoFactorRequired => Error::SessionExpired,
-            other => other,
-        })?;
-        Self::from_grant(&body)
-    }
-
-    /// `invalidate`: the token stops working. Best effort: the player is
-    /// signed out here whatever the answer.
+    /// `invalidate`: the token stops working. Best effort: the player is signed out here
+    /// whatever the answer.
     pub fn sign_out(&self) {
-        self.sign_out_at(&base_url());
-    }
-
-    fn sign_out_at(&self, base: &str) {
-        let _ = post_at(
-            base,
-            "/auth/invalidate",
-            serde_json::json!({
-                "accessToken": self.access_token,
-                "clientToken": self.client_token,
-            }),
-        );
+        client(&base_url()).invalidate(&self.access_token, &self.client_token);
     }
 }
 
-/// The two-factor code goes after the password, `password:code`.
-fn login_password(password: &str, two_factor: Option<&str>) -> String {
-    match two_factor.map(str::trim).filter(|c| !c.is_empty()) {
-        Some(code) => format!("{password}:{code}"),
-        None => password.to_owned(),
-    }
+fn client(base: &str) -> horizon_elyby::Client {
+    horizon_elyby::Client::at(
+        base,
+        &format!("Horizon/{}", horizon_core::release::VERSION),
+        Duration::from_secs(10),
+    )
 }
 
 /// Sign in with the account's login (username or e-mail) and password. An
@@ -215,19 +115,9 @@ fn authenticate_at(
     password: &str,
     two_factor: Option<&str>,
 ) -> Result<Account, Error> {
-    let mut random = [0u8; 16];
-    horizon_protocol::crypto::random_bytes(&mut random).map_err(|e| Error::Other(e.to_string()))?;
-    let body = post_at(
-        base,
-        "/auth/authenticate",
-        serde_json::json!({
-            "username": login.trim(),
-            "password": login_password(password, two_factor),
-            "clientToken": format!("{:032x}", u128::from_be_bytes(random)),
-            "requestUser": false,
-        }),
-    )?;
-    Account::from_grant(&body)
+    client(base)
+        .authenticate(login, password, two_factor)
+        .and_then(Account::from_grant)
 }
 
 /// Make a kept account usable: its token checked, renewed when refused. The flag says the
@@ -237,55 +127,14 @@ fn restore(account: &Account) -> Result<(Account, bool), Error> {
 }
 
 fn restore_at(account: &Account, base: &str) -> Result<(Account, bool), Error> {
-    if account.validate_at(base)? {
-        Ok((account.clone(), false))
-    } else {
-        account.refresh_at(base).map(|fresh| (fresh, true))
+    let client = client(base);
+    if client.validate(&account.access_token)? {
+        return Ok((account.clone(), false));
     }
-}
-
-fn agent() -> ureq::Agent {
-    ureq::AgentBuilder::new()
-        .timeout(Duration::from_secs(10))
-        .user_agent(&format!("Horizon/{}", horizon_core::release::VERSION))
-        .build()
-}
-
-fn post_at(base: &str, path: &str, body: serde_json::Value) -> Result<String, Error> {
-    match agent()
-        .post(&format!("{base}{path}"))
-        .set("Content-Type", "application/json; charset=utf-8")
-        .send_string(&body.to_string())
-    {
-        Ok(response) => response.into_string().map_err(|_| Error::Unavailable),
-        Err(ureq::Error::Status(status, response)) => Err(map_error(
-            status,
-            &response.into_string().unwrap_or_default(),
-        )),
-        Err(ureq::Error::Transport(_)) => Err(Error::Unavailable),
-    }
-}
-
-/// The authserver's `{"error", "errorMessage"}` bodies.
-fn map_error(status: u16, body: &str) -> Error {
-    let v: serde_json::Value = serde_json::from_str(body).unwrap_or_default();
-    let message = v.get("errorMessage").and_then(|m| m.as_str()).unwrap_or("");
-    if status >= 500 {
-        return Error::Unavailable;
-    }
-    if message.to_ascii_lowercase().contains("two factor") {
-        return Error::TwoFactorRequired;
-    }
-    if status == 401
-        || v.get("error").and_then(|e| e.as_str()) == Some("ForbiddenOperationException")
-    {
-        return Error::InvalidCredentials;
-    }
-    if message.is_empty() {
-        Error::Other(format!("Status: {status}"))
-    } else {
-        Error::Other(message.to_owned())
-    }
+    client
+        .refresh(&account.access_token, &account.client_token)
+        .and_then(Account::from_grant)
+        .map(|fresh| (fresh, true))
 }
 
 /// The account kept in `dir`, if any (a damaged file counts as none).
@@ -386,74 +235,19 @@ pub fn cli_sign_in(login: &str, dir: &Path) -> Result<Account, String> {
 }
 
 #[cfg(test)]
-pub(crate) mod mock {
-    use std::{
-        io::{Read, Write},
-        net::TcpListener,
-        time::Duration,
-    };
-
-    pub fn serve<F>(count: usize, mut handler: F) -> String
-    where
-        F: FnMut(&str, &str, &str) -> (u16, String) + Send + 'static,
-    {
-        let listener = TcpListener::bind("127.0.0.1:0").unwrap();
-        let addr = listener.local_addr().unwrap();
-        std::thread::spawn(move || {
-            for stream in listener.incoming().take(count) {
-                let Ok(mut stream) = stream else { continue };
-                let _ = stream.set_read_timeout(Some(Duration::from_secs(10)));
-                let mut buf = Vec::new();
-                let mut chunk = [0u8; 1024];
-                loop {
-                    let n = stream.read(&mut chunk).unwrap_or(0);
-                    if n == 0 {
-                        break;
-                    }
-                    buf.extend_from_slice(&chunk[..n]);
-                    if buf.windows(4).any(|w| w == b"\r\n\r\n") {
-                        break;
-                    }
-                }
-                let text = String::from_utf8_lossy(&buf).into_owned();
-                let (head, rest) = text.split_once("\r\n\r\n").unwrap_or((&text, ""));
-                let mut lines = head.lines();
-                let request = lines.next().unwrap_or("");
-                let mut parts = request.split_whitespace();
-                let method = parts.next().unwrap_or("");
-                let path = parts.next().unwrap_or("");
-                let len = lines
-                    .filter_map(|line| line.split_once(':'))
-                    .find(|(key, _)| key.eq_ignore_ascii_case("content-length"))
-                    .and_then(|(_, value)| value.trim().parse::<usize>().ok())
-                    .unwrap_or(0);
-                let mut body = rest.to_owned();
-                while body.len() < len {
-                    let n = stream.read(&mut chunk).unwrap_or(0);
-                    if n == 0 {
-                        break;
-                    }
-                    body.push_str(&String::from_utf8_lossy(&chunk[..n]));
-                }
-                let (status, response) = handler(method, path, &body);
-                let reason = if status == 200 { "OK" } else { "Error" };
-                let _ = write!(
-                    stream,
-                    "HTTP/1.1 {status} {reason}\r\nContent-Length: {}\r\nConnection: close\r\n\r\n{response}",
-                    response.len()
-                );
-            }
-        });
-        format!("http://{addr}")
-    }
-}
-
-#[cfg(test)]
 mod tests {
     use super::*;
 
     const UUID: u128 = 0x069a79f444e94726a5befca90e38aaf5;
-    const GRANT: &str = r#"{"accessToken":"acc","clientToken":"cli","availableProfiles":[{"id":"069a79f444e94726a5befca90e38aaf5","name":"Notch"}],"selectedProfile":{"id":"069a79f444e94726a5befca90e38aaf5","name":"Notch"}}"#;
+
+    fn grant() -> horizon_elyby::Grant {
+        horizon_elyby::Grant {
+            name: "Notch".into(),
+            uuid: format!("{UUID:032x}"),
+            access_token: "acc".into(),
+            client_token: "cli".into(),
+        }
+    }
 
     fn dir(name: &str) -> std::path::PathBuf {
         let d = std::env::temp_dir().join(format!("horizon-elyby-{name}-{}", std::process::id()));
@@ -464,62 +258,20 @@ mod tests {
 
     #[test]
     fn grants_become_accounts() {
-        let a = Account::from_grant(GRANT).unwrap();
+        let a = Account::from_grant(grant()).unwrap();
         assert_eq!((a.name.as_str(), a.uuid), ("Notch", UUID));
         let s = a.session();
         assert_eq!(s.provider, Provider::ElyBy);
         assert_eq!(s.uuid, UUID);
-        // No profile, a bad id, a name Minecraft can't carry, a broken body.
-        assert!(Account::from_grant(r#"{"accessToken":"a","clientToken":"c"}"#).is_err());
-        assert!(
-            Account::from_grant(
-                r#"{"accessToken":"a","clientToken":"c","selectedProfile":{"id":"nope","name":"N"}}"#
-            )
-            .is_err()
-        );
-        let long = GRANT.replace("\"name\":\"Notch\"", "\"name\":\"ThisNameIsTooLong17\"");
-        assert!(Account::from_grant(&long).is_err());
-        assert!(Account::from_grant("").is_err());
-    }
-
-    #[test]
-    fn errors_map_like_the_authserver_talks() {
-        let two = r#"{"error":"ForbiddenOperationException","errorMessage":"Account protected with two factor auth."}"#;
-        assert_eq!(map_error(401, two), Error::TwoFactorRequired);
-        let bad = r#"{"error":"ForbiddenOperationException","errorMessage":"Invalid credentials. Invalid email or password."}"#;
-        assert_eq!(map_error(401, bad), Error::InvalidCredentials);
-        assert_eq!(map_error(401, ""), Error::InvalidCredentials);
-        assert_eq!(map_error(503, "down"), Error::Unavailable);
-        assert_eq!(
-            map_error(
-                400,
-                r#"{"error":"IllegalArgumentException","errorMessage":"Bad"}"#
-            ),
-            Error::Other("Bad".into())
-        );
-        assert_eq!(map_error(400, ""), Error::Other("Status: 400".into()));
-    }
-
-    #[test]
-    fn two_factor_code_follows_the_password() {
-        assert_eq!(login_password("pw", None), "pw");
-        assert_eq!(login_password("pw", Some("")), "pw");
-        assert_eq!(login_password("pw", Some(" 123456 ")), "pw:123456");
-    }
-
-    #[test]
-    fn base_url_override() {
-        assert_eq!(normalize_base(None), DEFAULT_BASE);
-        assert_eq!(normalize_base(Some("  ")), DEFAULT_BASE);
-        assert_eq!(
-            normalize_base(Some("http://127.0.0.1:9/")),
-            "http://127.0.0.1:9"
-        );
+        // An id the launcher's client would not send still has to parse.
+        let mut bad = grant();
+        bad.uuid = "nope".into();
+        assert!(Account::from_grant(bad).is_err());
     }
 
     #[test]
     fn accounts_round_trip_and_hide_their_tokens() {
-        let a = Account::from_grant(GRANT).unwrap();
+        let a = Account::from_grant(grant()).unwrap();
         let back = Account::from_json(&a.to_json()).unwrap();
         assert_eq!((back.name.as_str(), back.uuid), ("Notch", UUID));
         assert_eq!(back.access_token, "acc");
@@ -535,34 +287,36 @@ mod tests {
 
     #[test]
     fn the_authserver_flow_works_against_a_mock() {
-        let refreshed = GRANT.replace("\"acc\"", "\"new\"");
-        let base = mock::serve(4, move |method, path, body| {
+        let refreshed = r#"{"accessToken":"new","clientToken":"cli","selectedProfile":{"id":"069a79f444e94726a5befca90e38aaf5","name":"Notch"}}"#;
+        let base = horizon_elyby::mock::serve(3, move |method, path, _, body| {
             assert_eq!(method, "POST");
             match path {
                 "/auth/authenticate" => {
                     assert!(body.contains("\"username\":\"Notch\""), "{body}");
                     assert!(body.contains("\"password\":\"pw\""), "{body}");
-                    (200, GRANT.to_owned())
+                    (
+                        200,
+                        r#"{"accessToken":"acc","clientToken":"cli","selectedProfile":{"id":"069a79f444e94726a5befca90e38aaf5","name":"Notch"}}"#
+                            .to_owned(),
+                    )
                 }
-                "/auth/validate" => (200, String::new()),
-                "/auth/refresh" => (200, refreshed.clone()),
-                "/auth/invalidate" => (200, String::new()),
+                "/auth/validate" => (401, "{}".into()),
+                "/auth/refresh" => (200, refreshed.to_owned()),
                 other => panic!("unexpected path {other}"),
             }
         });
         let account = authenticate_at(&base, "Notch", "pw", None).unwrap();
         assert_eq!(account.name, "Notch");
-        assert!(account.validate_at(&base).unwrap());
-        let fresh = account.refresh_at(&base).unwrap();
+        let (fresh, renewed) = restore_at(&account, &base).unwrap();
+        assert!(renewed);
         assert_eq!(fresh.access_token, "new");
-        account.sign_out_at(&base);
     }
 
     #[test]
     fn the_kept_account_is_private_and_replaceable() {
         let d = dir("kept");
         assert!(load(&d).is_none());
-        let a = Account::from_grant(GRANT).unwrap();
+        let a = Account::from_grant(grant()).unwrap();
         save(&d, &a).unwrap();
         assert_eq!(load(&d).unwrap().uuid, UUID);
         #[cfg(unix)]

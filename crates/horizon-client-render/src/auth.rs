@@ -664,8 +664,8 @@ fn parse_providers(text: Option<&str>) -> Vec<Provider> {
     let mut out = Vec::new();
     for part in text.unwrap_or("").split(',').map(str::trim) {
         let provider = match part.to_ascii_lowercase().as_str() {
-            "microsoft" | "msa" | "mojang" => Provider::Microsoft,
-            "elyby" | "ely.by" | "ely" => Provider::ElyBy,
+            "microsoft" => Provider::Microsoft,
+            "elyby" => Provider::ElyBy,
             _ => continue,
         };
         if !out.contains(&provider) {
@@ -1075,12 +1075,12 @@ mod tests {
             parse_providers(Some("elyby, microsoft")),
             vec![ElyBy, Microsoft]
         );
-        assert_eq!(parse_providers(Some("Ely.by,elyby,bogus")), vec![ElyBy]);
+        assert_eq!(parse_providers(Some("ElyBy, elyby, bogus")), vec![ElyBy]);
     }
 
     #[test]
     fn elyby_join_and_verify_use_the_authserver_session_paths() {
-        let base = crate::elyby::mock::serve(2, |method, path, body| {
+        let base = horizon_elyby::mock::serve(2, |method, path, _, body| {
             if path == "/session/join" {
                 assert_eq!(method, "POST");
                 assert!(body.contains("\"accessToken\":\"tok\""), "{body}");

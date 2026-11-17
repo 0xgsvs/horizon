@@ -2865,6 +2865,4 @@ fn java_player_with(
 }
 
 #[cfg(test)]
-mod http;
-#[cfg(test)]
 mod tests;

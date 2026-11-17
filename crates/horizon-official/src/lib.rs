@@ -48,6 +48,9 @@ static MOD_LINKS: [mod_links::Links; 2] = [
 /// Registers Horizon's in-game parts with the game. The executable calls it before it runs the
 /// game, and so does the launcher's generated executable for native mods.
 pub fn register() {
+    // The engine's Ely.by client holds no address of its own (engine code gets the Horizon
+    // layer's addresses passed in): the game's sign-in and --elyby-login use this one.
+    horizon_platform::elyby::set_built_in(horizon_addresses::ELYBY_AUTH);
     let late = PARTS.into_iter().map(hooks::register);
     let late = late.chain(STORES.into_iter().map(settings::register));
     let late = late.chain(MOD_LINKS.iter().map(mod_links::register));

@@ -128,76 +128,35 @@ impl Launcher {
         }
         let t = self.theme;
         let n = t.night;
-        let login = self
-            .ely_field(
-                "elyby-login",
-                &self.ely_login,
-                self.ely_login_focused,
-                &self.ely_login_focus,
-                "Ely.by login or e-mail",
-                false,
-            )
-            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                window.focus(&this.ely_login_focus, cx);
-                this.ely_login_focused = true;
-                cx.notify();
-            }))
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                match line_edit::handle(&mut this.ely_login, ev, cx) {
-                    line_edit::Key::Pass => return,
-                    line_edit::Key::Escape => window.blur(cx),
-                    _ => {}
-                }
-                cx.stop_propagation();
-                cx.notify();
-            }));
-        let password = self
-            .ely_field(
-                "elyby-password",
-                &self.ely_password,
-                self.ely_password_focused,
-                &self.ely_password_focus,
-                "Password",
-                true,
-            )
-            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                window.focus(&this.ely_password_focus, cx);
-                this.ely_password_focused = true;
-                cx.notify();
-            }))
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                match line_edit::handle(&mut this.ely_password, ev, cx) {
-                    line_edit::Key::Pass => return,
-                    line_edit::Key::Escape => window.blur(cx),
-                    _ => {}
-                }
-                cx.stop_propagation();
-                cx.notify();
-            }));
+        let login = self.ely_input(
+            cx,
+            "elyby-login",
+            |s| &mut s.ely_login,
+            |s| &mut s.ely_login_focused,
+            |s| &s.ely_login_focus,
+            "Ely.by login or e-mail",
+            false,
+        );
+        let password = self.ely_input(
+            cx,
+            "elyby-password",
+            |s| &mut s.ely_password,
+            |s| &mut s.ely_password_focused,
+            |s| &s.ely_password_focus,
+            "Password",
+            true,
+        );
         let two_factor = self.ely_state == Some(ElySignInState::TwoFactor);
         let code = two_factor.then(|| {
-            self.ely_field(
+            self.ely_input(
+                cx,
                 "elyby-code",
-                &self.ely_code,
-                self.ely_code_focused,
-                &self.ely_code_focus,
+                |s| &mut s.ely_code,
+                |s| &mut s.ely_code_focused,
+                |s| &s.ely_code_focus,
                 "Two-factor code",
                 false,
             )
-            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                window.focus(&this.ely_code_focus, cx);
-                this.ely_code_focused = true;
-                cx.notify();
-            }))
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                match line_edit::handle(&mut this.ely_code, ev, cx) {
-                    line_edit::Key::Pass => return,
-                    line_edit::Key::Escape => window.blur(cx),
-                    _ => {}
-                }
-                cx.stop_propagation();
-                cx.notify();
-            }))
         });
         let state = match &self.ely_state {
             None => String::new(),
@@ -312,19 +271,24 @@ impl Launcher {
             .child(card)
     }
 
-    fn ely_field(
-        &self,
+    /// An Ely.by field wired to its focus: a click puts the caret in, keys go to the field, and
+    /// Escape leaves it.
+    #[allow(clippy::too_many_arguments)]
+    fn ely_input(
+        &mut self,
+        cx: &mut Context<Self>,
         id: &'static str,
-        edit: &line_edit::LineEdit,
-        focused: bool,
-        focus: &FocusHandle,
+        edit: fn(&mut Self) -> &mut line_edit::LineEdit,
+        is_focused: fn(&mut Self) -> &mut bool,
+        focus: fn(&Self) -> &FocusHandle,
         placeholder: &'static str,
         mask: bool,
     ) -> Stateful<Div> {
         let t = self.theme;
+        let on = *is_focused(self);
         div()
             .id(id)
-            .track_focus(focus)
+            .track_focus(focus(self))
             .flex()
             .items_center()
             .w_full()
@@ -332,19 +296,33 @@ impl Launcher {
             .px(px(12.))
             .overflow_hidden()
             .border_2()
-            .border_color(if focused { t.accent } else { t.outline })
+            .border_color(if on { t.accent } else { t.outline })
             .bg(t.well)
             .font_family(theme::MONO)
             .text_size(px(13.))
             .cursor_text()
             .child(line_edit::content(
-                edit,
+                edit(self),
                 &t,
-                focused,
+                on,
                 false,
                 mask,
                 placeholder,
             ))
+            .on_click(cx.listener(move |this, _: &ClickEvent, window, cx| {
+                window.focus(focus(this), cx);
+                *is_focused(this) = true;
+                cx.notify();
+            }))
+            .on_key_down(cx.listener(move |this, ev: &KeyDownEvent, window, cx| {
+                match line_edit::handle(edit(this), ev, cx) {
+                    line_edit::Key::Pass => return,
+                    line_edit::Key::Escape => window.blur(cx),
+                    _ => {}
+                }
+                cx.stop_propagation();
+                cx.notify();
+            }))
     }
     /// Whether the screen covers the window: no owner, and either Play was refused or the player
     /// hasn't read it yet. The data question comes first.
@@ -1018,80 +996,41 @@ impl Launcher {
         use horizon_theme::glass::{ink, radius};
         let t = self.theme;
         let login = ui::wide_field(
-            self.ely_field(
+            self.ely_input(
+                cx,
                 "elyby-login",
-                &self.ely_login,
-                self.ely_login_focused,
-                &self.ely_login_focus,
+                |s| &mut s.ely_login,
+                |s| &mut s.ely_login_focused,
+                |s| &s.ely_login_focus,
                 "Ely.by login or e-mail",
                 false,
-            )
-            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                window.focus(&this.ely_login_focus, cx);
-                this.ely_login_focused = true;
-                cx.notify();
-            }))
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                match line_edit::handle(&mut this.ely_login, ev, cx) {
-                    line_edit::Key::Pass => return,
-                    line_edit::Key::Escape => window.blur(cx),
-                    _ => {}
-                }
-                cx.stop_propagation();
-                cx.notify();
-            })),
+            ),
             self.ely_login_focused,
         );
         let password = ui::wide_field(
-            self.ely_field(
+            self.ely_input(
+                cx,
                 "elyby-password",
-                &self.ely_password,
-                self.ely_password_focused,
-                &self.ely_password_focus,
+                |s| &mut s.ely_password,
+                |s| &mut s.ely_password_focused,
+                |s| &s.ely_password_focus,
                 "Password",
                 true,
-            )
-            .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                window.focus(&this.ely_password_focus, cx);
-                this.ely_password_focused = true;
-                cx.notify();
-            }))
-            .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                match line_edit::handle(&mut this.ely_password, ev, cx) {
-                    line_edit::Key::Pass => return,
-                    line_edit::Key::Escape => window.blur(cx),
-                    _ => {}
-                }
-                cx.stop_propagation();
-                cx.notify();
-            })),
+            ),
             self.ely_password_focused,
         );
         let two_factor = self.ely_state == Some(ElySignInState::TwoFactor);
         let code = two_factor.then(|| {
             ui::wide_field(
-                self.ely_field(
+                self.ely_input(
+                    cx,
                     "elyby-code",
-                    &self.ely_code,
-                    self.ely_code_focused,
-                    &self.ely_code_focus,
+                    |s| &mut s.ely_code,
+                    |s| &mut s.ely_code_focused,
+                    |s| &s.ely_code_focus,
                     "Two-factor code",
                     false,
-                )
-                .on_click(cx.listener(|this, _: &ClickEvent, window, cx| {
-                    window.focus(&this.ely_code_focus, cx);
-                    this.ely_code_focused = true;
-                    cx.notify();
-                }))
-                .on_key_down(cx.listener(|this, ev: &KeyDownEvent, window, cx| {
-                    match line_edit::handle(&mut this.ely_code, ev, cx) {
-                        line_edit::Key::Pass => return,
-                        line_edit::Key::Escape => window.blur(cx),
-                        _ => {}
-                    }
-                    cx.stop_propagation();
-                    cx.notify();
-                })),
+                ),
                 self.ely_code_focused,
             )
         });

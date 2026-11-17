@@ -13,6 +13,7 @@ members = [
     "crates/horizon-heartbeat",
 
     "crates/horizon-core",
+    "crates/horizon-elyby",
     "crates/horizon-platform",
     "crates/horizon-addresses",
     "crates/horizon-mod-runtime",

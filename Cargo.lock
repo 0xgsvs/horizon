@@ -2018,6 +2018,7 @@ dependencies = [
  "horizon-client-input",
  "horizon-command",
  "horizon-core",
+ "horizon-elyby",
  "horizon-engine-slots",
  "horizon-guest-stack",
  "horizon-hdr",
@@ -2114,6 +2115,15 @@ dependencies = [
  "hidapi",
  "log",
  "windows 0.62.2",
+]
+
+[[package]]
+name = "horizon-elyby"
+version = "0.1.0"
+dependencies = [
+ "getrandom 0.3.4",
+ "serde_json",
+ "ureq",
 ]
 
 [[package]]
@@ -2644,6 +2654,7 @@ version = "0.1.0"
 dependencies = [
  "horizon-bench",
  "horizon-core",
+ "horizon-elyby",
  "horizon-guest-stack",
  "horizon-hooks",
  "horizon-java-properties",

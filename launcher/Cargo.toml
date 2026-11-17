@@ -53,7 +53,7 @@ horizon-theme = { path = "../crates/horizon-theme" }
 horizon-launcher-scenery = { path = "scenery" }
 # The engine, through the platform's public API (docs/layers.md): the pinned version, No AI, the preparer,
 # level.dat and servers.dat (the worlds and server lists of instances), and the official server's SRV record.
-horizon-platform = { path = "../crates/horizon-platform", features = ["prepare", "protocol", "world", "mod-build", "mod-index", "mod-prebuilt", "mod-runtime-process"] }
+horizon-platform = { path = "../crates/horizon-platform", features = ["prepare", "protocol", "world", "mod-build", "mod-index", "mod-prebuilt", "mod-runtime-process", "elyby"] }
 horizon-cosmetics = { path = "../crates/horizon-cosmetics" }
 glam = "0.30"
 # `horizon-launcher mcp`: the Model Context Protocol, shared with horizon-ctl and horizon-server.
@@ -128,6 +128,8 @@ syn = "2"
 # Headless layout tests: GPUI's test platform draws without a GPU or a real window, and its
 # NoopTextSystem shapes deterministically (glass_server_dialog.rs's foot tests).
 gpui = { package = "gpui-fast", version = "0.1.13", features = ["test-support"] }
+# The test HTTP server the Ely.by authserver tests answer with.
+horizon-elyby = { path = "../crates/horizon-elyby", features = ["mock"] }
 
 [features]
 default = ["no-self-update"]

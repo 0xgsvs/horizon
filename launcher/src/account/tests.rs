@@ -149,7 +149,7 @@ fn route(mock: &mut Mock, method: &str, path: &str, auth: &str, body: &str) -> (
 }
 
 fn serve(mock: Arc<Mutex<Mock>>) -> Endpoints {
-    let base = super::http::serve(usize::MAX, move |method, path, auth, body| {
+    let base = horizon_elyby::mock::serve(usize::MAX, move |method, path, auth, body| {
         let mut m = mock.lock().unwrap();
         // A bare `GET /` is a local tool probing every new port (T3 Code does, on the Mac
         // mini), not the launcher: no endpoint here is the root.

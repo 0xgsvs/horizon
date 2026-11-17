@@ -13,7 +13,6 @@ jobs:
 
     env:
       RUSTFLAGS: "-C target-feature=+crt-static"
-      HORIZON_LAUNCHER_NO_SELF_UPDATE: "1"
       HORIZON_MSA_CLIENT_ID: ${{ vars.HORIZON_MSA_CLIENT_ID }}
       HORIZON_CURSEFORGE_API_KEY: ${{ secrets.HORIZON_CURSEFORGE_API_KEY }}
 

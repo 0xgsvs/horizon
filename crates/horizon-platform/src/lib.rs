@@ -49,6 +49,10 @@ pub use horizon_prepare as prepare;
 #[cfg(feature = "server-files")]
 pub use horizon_server_files as server_files;
 
+/// Ely.by's authserver (`horizon-elyby`): the sign-in the launcher and the game share.
+#[cfg(feature = "elyby")]
+pub use horizon_elyby as elyby;
+
 /// `java.util.Properties` and the JDK's date text, for the files a server keeps in that format.
 #[cfg(feature = "server-files")]
 pub use horizon_java_properties as java_properties;

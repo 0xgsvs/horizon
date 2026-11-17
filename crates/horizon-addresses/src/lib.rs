@@ -51,6 +51,11 @@ pub const MODPACK_DOWNLOAD_HOSTS: &[&str] = &[
 /// (`HORIZON_COSMETICS_API` overrides it).
 pub const COSMETICS_API: &str = "https://cosmetics.playhorizon.dev";
 
+/// Ely.by's Yggdrasil authserver: the sign-in the launcher offers and the game accepts
+/// (`HORIZON_ELYBY_URL` overrides it). The client itself is the engine's `horizon-elyby`,
+/// which takes this address from the products that use it.
+pub const ELYBY_AUTH: &str = "https://authserver.ely.by";
+
 /// The telemetry ingest server (`crates/horizon-telemetry-server`): opt-in telemetry, the
 /// "I'm playing" ping, benchmark uploads (`HORIZON_TELEMETRY_URL` overrides it).
 pub const TELEMETRY: &str = "https://telemetry.playhorizon.dev";

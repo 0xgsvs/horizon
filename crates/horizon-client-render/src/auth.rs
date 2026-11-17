@@ -268,11 +268,42 @@ pub fn endpoint(doc: &serde_json::Value, service: &str, name: &str) -> Option<St
 /// attributes call falls back to the offline properties, a failed profile call
 /// to no actions, as vanilla does. Blocks: call it off the main thread.
 pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::AccountStatus {
+    fetch_account_status_with(session, discovery)
+}
+
+/// `fetch_account_status` with the discovery step passed in: the gate runs before it, so
+/// an account outside Microsoft's services asks nothing at all.
+fn fetch_account_status_with(
+    session: &AuthSession,
+    discovered: impl FnOnce() -> Result<Arc<serde_json::Value>, JoinError>,
+) -> crate::ban_notice::AccountStatus {
+    if !session.uses_microsoft_services() {
+        return crate::ban_notice::AccountStatus::default();
+    }
+    let Ok(doc) = discovered() else {
+        return crate::ban_notice::AccountStatus::default();
+    };
+    fetch_account_status_at(session, Some(&doc))
+}
+
+/// `fetch_account_status` with the discovery document passed in; the gate and the two
+/// calls, apart from discovery.
+fn fetch_account_status_at(
+    session: &AuthSession,
+    doc: Option<&serde_json::Value>,
+) -> crate::ban_notice::AccountStatus {
     use crate::ban_notice::{AccountStatus, parse_profile_actions, parse_properties};
-    let Ok(doc) = discovery() else {
+    // `getAttributes` is Microsoft's and takes the session's token. An Ely.by token
+    // belongs to Ely.by's authserver and must never be offered to Microsoft's: the
+    // offline properties vanilla falls back to are what an account outside Microsoft's
+    // services gets instead.
+    if !session.uses_microsoft_services() {
+        return AccountStatus::default();
+    }
+    let Some(doc) = doc else {
         return AccountStatus::default();
     };
-    let properties = endpoint(&doc, "player", "getAttributes")
+    let properties = endpoint(doc, "player", "getAttributes")
         .and_then(|url| {
             agent()
                 .get(&url)
@@ -284,7 +315,7 @@ pub fn fetch_account_status(session: &AuthSession) -> crate::ban_notice::Account
         })
         .and_then(|body| parse_properties(&body))
         .unwrap_or_default();
-    let actions = endpoint(&doc, "session", "getProfileById")
+    let actions = endpoint(doc, "session", "getProfileById")
         .and_then(|url| {
             let url = url.replace("{profileId}", &format!("{:032x}", session.uuid));
             agent()
@@ -1142,6 +1173,36 @@ mod tests {
                 .unwrap()
                 .unwrap();
         assert_eq!(profile.uuid, UUID);
+    }
+
+    #[test]
+    fn an_elyby_session_asks_no_microsoft_service_for_its_status() {
+        use std::sync::{
+            Arc,
+            atomic::{AtomicBool, Ordering},
+        };
+        let asked = Arc::new(AtomicBool::new(false));
+        let flag = asked.clone();
+        // Either request would connect here; the mock records any connection at all.
+        let url = horizon_elyby::mock::serve(1, move |_, _, _, _| {
+            flag.store(true, Ordering::SeqCst);
+            (200, "{}".to_owned())
+        });
+        let discovered = AtomicBool::new(false);
+        let mut session = AuthSession::new("Notch", UUID, "elyby-token");
+        session.provider = Provider::ElyBy;
+        let status = fetch_account_status_with(&session, || {
+            discovered.store(true, Ordering::SeqCst);
+            Ok(Arc::new(serde_json::json!({"discovery": {
+                "player": {"endpoints": {"getAttributes": {"uri": format!("{url}/player/attributes")}}},
+                "session": {"endpoints": {"getProfileById": {
+                    "uri": format!("{url}/session/profile/{{profileId}}"),
+                }}},
+            }})))
+        });
+        assert_eq!(status, crate::ban_notice::AccountStatus::default());
+        assert!(!discovered.load(Ordering::SeqCst), "no discovery request");
+        assert!(!asked.load(Ordering::SeqCst), "no bearer request");
     }
 
     #[test]

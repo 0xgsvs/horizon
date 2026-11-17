@@ -22,6 +22,12 @@ pub struct Profile {
     pub name: String,
 }
 
+/// `invalidate`: signing out of the launcher stops the token working too. Best effort: the
+/// account leaves this computer whatever the authserver answers.
+pub fn invalidate(secrets: &Secrets) {
+    client(&base_url()).invalidate(&secrets.access_token, &secrets.client_token);
+}
+
 /// The tokens that keep an Ely.by account signed in.
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Secrets {

@@ -2617,3 +2617,32 @@ fn the_games_made_up_name_comes_from_its_file() {
     assert_eq!(offline_game_name(&dir), None);
     let _ = std::fs::remove_dir_all(&dir);
 }
+
+/// A launch without a session file must not let the game pick up an Ely.by account of its own:
+/// the env switch says so, where an older build that has no `--offline` ignores it.
+#[test]
+fn a_launch_without_a_session_file_tells_the_game_not_to_sign_in() {
+    let dir = std::env::temp_dir().join(format!("horizon-offline-session-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let refused = session_file(
+        &dir,
+        Launch {
+            session: None,
+            offline: Some("no owner".into()),
+            owner: None,
+            unsaved: None,
+        },
+        Vec::new(),
+    );
+    assert!(refused.file.is_none());
+    assert_eq!(refused.offline.as_deref(), Some("no owner"));
+    assert!(
+        refused
+            .env
+            .iter()
+            .any(|(key, value)| *key == OFFLINE_ENV && value == "1"),
+        "the game is told to stay offline: {:?}",
+        refused.env
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}

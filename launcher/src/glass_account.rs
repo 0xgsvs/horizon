@@ -12,8 +12,8 @@ use horizon_theme::glass::{ink, radius};
 impl Launcher {
     pub(super) fn glass_account(&mut self, cx: &mut Context<Self>) -> Div {
         let wide = self.window_width >= crate::glass_home::WIDE;
-        // Signed out, "who plays" would only repeat the Microsoft card's call to sign in.
-        if self.accounts.selected().is_none() {
+        // Nobody playing yet, "who plays" would only repeat the Microsoft card's call to sign in.
+        if self.accounts.player().is_none() {
             return div().child(self.glass_microsoft_card(cx).w_full());
         }
         let left = self.glass_who_plays();

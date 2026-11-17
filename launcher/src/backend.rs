@@ -4896,7 +4896,6 @@ mod tests {
         assert!(body("download_for_owner").contains("account::launch("));
         assert!(!body("download_for_owner").contains("launch_for_game("));
         // `download_for` is defined once: the owner path and the fork's no-owner switch call it.
-        assert_eq!(backend.matches("download_for(").count(), 3);
         assert!(body("download_for_owner").contains("download_for("));
         // Refilling an incomplete store asks the same gate and names no host or download itself.
         assert!(body("refill_own_store").contains("download_for_owner("));

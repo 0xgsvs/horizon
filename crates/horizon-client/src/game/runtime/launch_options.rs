@@ -275,7 +275,9 @@ impl Options {
             session_stdin: false,
             elyby_login: None,
             elyby_logout: false,
-            offline: false,
+            // The launcher sends no session file for a launch that plays offline: this keeps a
+            // kept Ely.by account out of it (an environment variable, so older builds ignore it).
+            offline: std::env::var_os("HORIZON_OFFLINE").is_some(),
         };
         for argument in rest {
             match argument {
@@ -449,6 +451,22 @@ mod tests {
             .unwrap()
             .unwrap()
             .time_limit()
+    }
+
+    /// The fork's account flags reach `Options` (the logout path ends the run in `from_launch`
+    /// and is exercised by hand).
+    #[test]
+    fn the_elyby_and_offline_flags_are_read() {
+        let read = |args: &[&str]| {
+            Options::parse(args.iter().map(|arg| arg.to_string()))
+                .unwrap()
+                .unwrap()
+        };
+        let offline = read(&["--offline", "--elyby-login", "me@example.com"]);
+        assert!(offline.offline);
+        assert_eq!(offline.elyby_login.as_deref(), Some("me@example.com"));
+        assert!(!read(&[]).offline);
+        assert!(read(&[]).elyby_login.is_none());
     }
 
     /// Upstream's regression: a control-socket run must not outlive its explicit deadline.

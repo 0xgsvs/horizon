@@ -4,7 +4,8 @@ Horizon signs players in with their Microsoft account in the launcher and joins 
 (authenticated) servers like vanilla 26.3 does. The launcher plays only with an account that owns
 Minecraft: Java Edition ([the owner gate](#the-owner-gate)), as that account, on LAN and
 offline-mode servers too. Ely.by accounts play without a Microsoft account
-([elyby-account.md](elyby-account.md)); there are no offline names. This note is the design, the
+([elyby-account.md](elyby-account.md)), and a player can also play under a name the game made up
+(Play offline in the launcher, `--offline` in the game). This note is the design, the
 status of each part and what Ludovic has to register.
 
 ## What Ludovic registers (needs his accounts)

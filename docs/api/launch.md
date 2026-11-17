@@ -40,14 +40,17 @@ option, the `--launch-api` reply and the exit codes.
 
 ### The session JSON
 
-The account the game joins online-mode servers with ([microsoft-account.md](../microsoft-account.md)):
+The account the game joins online-mode servers with ([microsoft-account.md](../microsoft-account.md),
+[elyby-account.md](../elyby-account.md)):
 
 ```json
 {"name": "Alex", "uuid": "069a79f444e94726a5befca90e38aaf5", "access_token": "…", "user_type": "msa", "xuid": "…"}
 ```
 
-- `name`, `uuid` (with or without dashes) and `access_token` are required; `user_type`, when present, is `msa`;
-  `xuid` is optional.
+- `name`, `uuid` (with or without dashes) and `access_token` are required; `user_type`, when present, is `msa`
+  for a Microsoft account or `elyby` for an Ely.by one; `xuid` is optional and Microsoft-only.
+- A launch that plays under the game's own name passes no session file and sets `HORIZON_OFFLINE=1` (older
+  builds ignore it); `--offline` does the same when the game is started by hand.
 - `--session-stdin`: write the JSON to the game's standard input and close it.
 - `--session-file PATH`: a file the game reads once and deletes at once. On Unix its mode must be 0600; a file
   older than two minutes is refused (and deleted).

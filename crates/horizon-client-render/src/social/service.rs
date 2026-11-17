@@ -80,7 +80,7 @@ pub(super) struct Failure {
 
 /// The discovery document's `player` service endpoint.
 pub(super) fn session() -> Option<Arc<AuthSession>> {
-    auth::current().filter(|s| !s.expired())
+    auth::current().filter(|s| s.uses_microsoft_services() && !s.expired())
 }
 
 pub(super) fn url(name: &str) -> Option<String> {

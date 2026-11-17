@@ -61,6 +61,13 @@ pub fn parse_uuid(text: &str) -> Option<u128> {
 }
 
 impl AuthSession {
+    /// Whether this is Microsoft's session: the only one whose services (profile keys, profile
+    /// textures, Realms, the social service) accept this token. An Ely.by token belongs to
+    /// Ely.by's authserver and must never be offered to Microsoft's.
+    pub fn uses_microsoft_services(&self) -> bool {
+        self.provider == Provider::Microsoft
+    }
+
     /// For tests and harnesses.
     pub fn new(name: &str, uuid: u128, access_token: &str) -> Self {
         Self {
@@ -75,7 +82,8 @@ impl AuthSession {
     pub fn access_token(&self) -> &str {
         &self.access_token
     }
-    /// The session file's JSON: {"name", "uuid", "access_token", "user_type": "msa", "xuid"}.
+    /// The session file's JSON: {"name", "uuid", "access_token", "user_type", "xuid"}, where
+    /// `user_type` is `msa` when present for Microsoft's and `elyby` for an Ely.by account.
     pub fn parse(text: &str) -> Result<Self, String> {
         let v: serde_json::Value =
             serde_json::from_str(text).map_err(|_| "the session is not valid JSON")?;
@@ -489,6 +497,11 @@ pub fn parse_certificates(body: &str) -> Option<ChatKeyPair> {
 /// UserApiService.getKeyPair: the certificates endpoint, POSTed with the
 /// access token.
 pub fn fetch_chat_keys(session: &AuthSession) -> Result<ChatKeyPair, JoinError> {
+    if !session.uses_microsoft_services() {
+        return Err(JoinError::Other(
+            "the session is not a Microsoft account".to_owned(),
+        ));
+    }
     let doc = discovery()?;
     let url = endpoint(&doc, "player", "getCertificates").ok_or(JoinError::Unavailable)?;
     let body = match agent()
@@ -537,6 +550,9 @@ pub fn prepare_chat_keys(now: bool) {
 
 /// Prepare keys for this player, independently of the other local accounts.
 pub fn prepare_chat_keys_for(session: Arc<AuthSession>, now: bool) {
+    if !session.uses_microsoft_services() {
+        return;
+    }
     let uuid = session.uuid;
     let mut accounts = CHAT_KEYS.lock().unwrap();
     let keys = accounts.entry(uuid).or_default();
@@ -593,6 +609,9 @@ const MINECRAFT_PROFILE: &str = "https://api.minecraftservices.com/minecraft/pro
 /// Single-player and integrated servers often send no `textures` property, or
 /// one without the equipped cape; the client asks the profile endpoint once.
 pub fn own_textures(session: &AuthSession) -> Option<crate::skins::Textures> {
+    if !session.uses_microsoft_services() {
+        return None;
+    }
     let response = agent()
         .get(MINECRAFT_PROFILE)
         .set("Authorization", &format!("Bearer {}", session.access_token))
@@ -1053,6 +1072,22 @@ mod tests {
             }
         }
         out
+    }
+
+    #[test]
+    fn an_elyby_session_starts_no_microsoft_key_work() {
+        let elyby_session = || {
+            let mut session = AuthSession::new("Ann", 202, "ely-token");
+            session.provider = Provider::ElyBy;
+            session
+        };
+        let session = elyby_session();
+        prepare_chat_keys_for(Arc::new(elyby_session()), true);
+        // No fetch is scheduled, and the Microsoft-only answers stay empty or refused.
+        assert!(!CHAT_KEYS.lock().unwrap().contains_key(&session.uuid));
+        assert!(!session.uses_microsoft_services());
+        assert!(fetch_chat_keys(&session).is_err());
+        assert!(own_textures(&session).is_none());
     }
 
     #[test]

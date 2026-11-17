@@ -619,7 +619,11 @@ impl Launcher {
     fn glass_settings_sections(&mut self, b: Built, cx: &mut Context<Self>) -> Vec<Div> {
         let t = self.theme;
         let n = 0;
-        let account = section(2).child(self.glass_account(cx));
+        // The glass card shows who plays from any provider; the Ely.by accounts keep their own
+        // Play as / Sign out rows under it, so a token can be removed in this look too.
+        let account_card = self.glass_account(cx);
+        let elyby = self.elyby_rows(0, cx).0;
+        let account = section(2).child(account_card).child(elyby);
         let updates = section(3)
             .child(self.update_tiles(b.horizon, b.horizon_action, b.launcher, b.launcher_action))
             .child(index_row(

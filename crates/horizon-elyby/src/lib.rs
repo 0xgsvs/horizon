@@ -1,8 +1,9 @@
-//! Ely.by's Yggdrasil-compatible authserver (https://ely.by), the client the launcher and the
-//! game share: a sign-in with a login and password (and a two-factor code when the account asks
-//! for one), then the `validate`, `refresh` and `invalidate` calls that keep the token alive
-//! ([docs/elyby-account.md](../../docs/elyby-account.md)). Passwords are never kept; each caller
-//! stores what [`Grant`] carries its own way (the launcher's keychain, the game's private file).
+//! Ely.by's Yggdrasil-compatible authserver (<https://ely.by>), the client the launcher and
+//! the game share: a sign-in with a login and password (and a two-factor code when the account
+//! asks for one), then the `validate`, `refresh` and `invalidate` calls that keep the token
+//! alive ([docs/elyby-account.md](../../../docs/elyby-account.md)). Passwords are never kept;
+//! each caller stores what [`Grant`] carries its own way (the launcher's keychain, the game's
+//! private file).
 //!
 //! The address comes from the product: `HORIZON_ELYBY_URL` when set (tests and local mocks),
 //! else the address the executable passed in ([`set_built_in`]) from the Horizon layer's list
@@ -90,11 +91,6 @@ pub struct Client {
 }
 
 impl Client {
-    /// Against [`base_url`].
-    pub fn new(user_agent: &str, timeout: Duration) -> Self {
-        Self::at(base_url(), user_agent, timeout)
-    }
-
     pub fn at(base: impl Into<String>, user_agent: &str, timeout: Duration) -> Self {
         let agent = ureq::AgentBuilder::new()
             .timeout(timeout)
@@ -102,10 +98,6 @@ impl Client {
             .build();
         let base = normalize_base(Some(base.into().as_str())).unwrap_or_default();
         Self { base, agent }
-    }
-
-    pub fn base(&self) -> &str {
-        &self.base
     }
 
     /// Sign in with the account's login (username or e-mail) and password. An account with
@@ -390,7 +382,7 @@ mod tests {
     }
 
     #[test]
-    fn base_addresses_normalize_and_the_environment_wins() {
+    fn base_addresses_normalize() {
         assert_eq!(normalize_base(None), None);
         assert_eq!(normalize_base(Some("  ")), None);
         assert_eq!(

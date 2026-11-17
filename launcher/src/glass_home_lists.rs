@@ -400,9 +400,10 @@ impl Launcher {
             36.,
             &t,
         );
-        // Signed out, Join signs in first, as Play does; otherwise a dimmed Join says why.
+        // Signed out, Join signs in first, as Play does; anyone playing (Microsoft, Ely.by or
+        // offline) joins with the identity they chose. Otherwise a dimmed Join says why.
         let signed_out =
-            self.owner == Some(false) && !horizon_launcher::developer_offline::selected();
+            self.accounts.player().is_none() && !horizon_launcher::developer_offline::selected();
         let join = if signed_out && !offline {
             join.tooltip(ui::tip(tr("Sign in to join")))
                 .on_click(cx.listener(|this, _: &ClickEvent, _, cx| {

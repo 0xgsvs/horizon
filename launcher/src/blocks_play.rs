@@ -271,7 +271,10 @@ impl Launcher {
         // account that owns the game (Play needs one), or offline. The glass look's top bar has
         // Sign in with Microsoft and says Offline itself.
         if !t.glass {
-            if self.owner == Some(false) {
+            // A signed-in Ely.by player needs no Microsoft owner row: their session plays as it is.
+            if self.owner == Some(false)
+                && !matches!(self.accounts.player(), Some(account::Player::ElyBy(_)))
+            {
                 rows = rows.child(index_row(
                     5,
                     tr("Microsoft account"),

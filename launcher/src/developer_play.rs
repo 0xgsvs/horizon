@@ -10,6 +10,9 @@ impl Launcher {
         if let Some(tag) = self.starting_client.take() {
             let instance_id = self.starting_instance.take();
             let mut cmd = backend::client_command(&tag);
+            // The launcher decides this launch's sign-in; a variable from its own environment
+            // says nothing about the game it starts.
+            cmd.env_remove(account::OFFLINE_ENV);
             let pass = match session {
                 Ok(pass) => pass,
                 Err(refused) => {

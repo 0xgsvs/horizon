@@ -1961,6 +1961,17 @@ impl Accounts {
         secrets: &elyby::Secrets,
     ) -> Result<(), String> {
         let _operation = session::lock(store)?;
+        self.keep_elyby(store, profile, secrets)
+    }
+
+    /// [`add_elyby`](Self::add_elyby) for a caller that already holds `session::lock`: the
+    /// sign-in thread loads, changes and saves the accounts with nothing else able to write.
+    fn keep_elyby(
+        &mut self,
+        store: &dyn SecretStore,
+        profile: elyby::Profile,
+        secrets: &elyby::Secrets,
+    ) -> Result<(), String> {
         self.keep_elyby_secrets(store, &profile.uuid, secrets)?;
         self.elyby.retain(|a| a.uuid != profile.uuid);
         self.elyby.push(ElyByAccount {
@@ -1998,6 +2009,10 @@ impl Accounts {
     /// Sign out of an Ely.by account: the secrets leave the keychain, the account the list.
     pub fn remove_elyby(&mut self, store: &dyn SecretStore, uuid: &str) -> Result<(), String> {
         let _operation = session::lock(store)?;
+        // The token stops working on the authserver too, not only here (best effort).
+        if let Some(secrets) = self.elyby_secrets(store, uuid) {
+            elyby::invalidate(&secrets);
+        }
         store.delete(&elyby_key(uuid))?;
         self.elyby.retain(|a| a.uuid != uuid);
         if self.elyby_selected.as_deref() == Some(uuid) {
@@ -2324,8 +2339,24 @@ fn write_launch_session_file(
     secrets: &Secrets,
 ) -> Result<PathBuf, String> {
     let path = write_session_file(dir, account, secrets)?;
+    Ok(track_unread(path))
+}
+
+/// [`write_elyby_session_file`] for a game this launcher is about to start (see [`UNREAD`]).
+fn write_launch_elyby_session_file(
+    dir: &Path,
+    name: &str,
+    uuid: &str,
+    access_token: &str,
+) -> Result<PathBuf, String> {
+    let path = write_elyby_session_file(dir, name, uuid, access_token)?;
+    Ok(track_unread(path))
+}
+
+/// Records a session file for [`discard_unread_sessions`] and its reaper.
+fn track_unread(path: PathBuf) -> PathBuf {
     let Ok(mut unread) = UNREAD.lock() else {
-        return Ok(path);
+        return path;
     };
     if unread.is_empty() {
         // One reaper while files wait; it ends with the list (under its lock, so a file added
@@ -2344,7 +2375,7 @@ fn write_launch_session_file(
             });
     }
     unread.push(path.clone());
-    Ok(path)
+    path
 }
 
 /// Deletes the files of `unread` older than `life` (the game would refuse them) and forgets
@@ -2491,6 +2522,21 @@ pub struct GameSession {
     pub env: Vec<(&'static str, String)>,
 }
 
+/// The game's "play under the name it has, do not sign in" switch, for a launch whose account
+/// plays offline: an environment variable, so an older game build that predates `--offline`
+/// starts unchanged instead of refusing an unknown option.
+pub const OFFLINE_ENV: &str = "HORIZON_OFFLINE";
+
+impl GameSession {
+    /// No session file: the game must not pick up a kept Ely.by account of its own either.
+    fn without_sign_in(mut self) -> Self {
+        if self.file.is_none() {
+            self.env.push((OFFLINE_ENV, "1".to_owned()));
+        }
+        self
+    }
+}
+
 /// Where an Ely.by sign-in is. `TwoFactor` keeps the login and password for the next try.
 #[derive(Clone, Debug, PartialEq)]
 pub enum ElySignInState {
@@ -2530,10 +2576,14 @@ impl ElySignIn {
                 return;
             }
             let store = store();
-            let mut accounts = Accounts::load();
-            let saved = accounts
-                .add_elyby(store, profile.clone(), &secrets)
-                .and_then(|()| accounts.save());
+            // The Microsoft flow's rule: the lock is taken before the accounts are read, so
+            // an account signed in, out or switched while Ely.by answered stays.
+            let saved = (|| {
+                let _operation = session::lock(store)?;
+                let mut accounts = Accounts::load();
+                accounts.keep_elyby(store, profile.clone(), &secrets)?;
+                accounts.save()
+            })();
             match saved {
                 Ok(()) => set(ElySignInState::Done(Ok(ElyByAccount {
                     uuid: profile.uuid,
@@ -2566,7 +2616,7 @@ pub fn session_for_game(game_home: &Path) -> Result<GameSession, NoOwner> {
     // Offline: no session file, so the game plays under the name it made up; Play has no
     // Microsoft owner gate to pass.
     if accounts.offline_play {
-        return Ok(GameSession::default());
+        return Ok(GameSession::default().without_sign_in());
     }
     let pass = launch_for_game(
         &Endpoints::live(),
@@ -2604,8 +2654,23 @@ fn elyby_session_for_game(
         Err(elyby::Error::Unavailable) => (profile, secrets),
         Err(e) => return Err(e.to_string()),
     };
-    let _ = accounts.keep_elyby_secrets(store(), &account.uuid, &secrets);
-    let file = write_elyby_session_file(
+    // A renewed token (and a renamed profile) is kept like the Microsoft flow's renewal: the
+    // lock is held across load and save, so an account switched meanwhile stays.
+    {
+        let store = store();
+        let _operation = session::lock(store)?;
+        let mut renewed = Accounts::load();
+        if let Some(a) = renewed.elyby.iter_mut().find(|a| a.uuid == account.uuid) {
+            a.name = profile.name.clone();
+        }
+        if let Err(e) = renewed.keep_elyby_secrets(store, &account.uuid, &secrets) {
+            eprintln!("Horizon: the renewed Ely.by token is not saved: {e}");
+        }
+        if let Err(e) = renewed.save() {
+            eprintln!("Horizon: the Ely.by account is not saved: {e}");
+        }
+    }
+    let file = write_launch_elyby_session_file(
         &game_home.join("sessions"),
         &profile.name,
         &profile.uuid,
@@ -2676,7 +2741,7 @@ fn session_file(game_home: &Path, pass: Launch, env: Vec<(&'static str, String)>
             Err(e) => out.offline = Some(e),
         }
     }
-    out
+    out.without_sign_in()
 }
 
 fn split_sessions(

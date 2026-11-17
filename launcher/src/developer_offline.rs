@@ -92,6 +92,9 @@ fn supports_restriction(bytes: &[u8]) -> bool {
 
 pub fn mark(cmd: &mut Command) {
     cmd.arg(FLAG)
+        // An unsigned launch must not pick up a kept Ely.by account of its own (the game
+        // reads this; older builds ignore it).
+        .env(crate::account::OFFLINE_ENV, "1")
         .env_remove("HORIZON_SESSION_FILE")
         .env_remove("HORIZON_ACCOUNT_SESSIONS")
         .env_remove("HORIZON_LAUNCHER_EXE");

@@ -31,6 +31,9 @@ pub fn client_as(tag: &str, who: Option<&str>) -> Result<Command, String> {
     complete_assets(tag);
     crate::browser::horizon::before_play(&game_home());
     let mut cmd = client_command(tag);
+    // The launcher decides this launch's sign-in; a variable from its own environment says
+    // nothing about the game it starts.
+    cmd.env_remove(account::OFFLINE_ENV);
     if let Some(session) = session {
         if let Some(file) = session.file {
             cmd.arg("--session-file").arg(file);
